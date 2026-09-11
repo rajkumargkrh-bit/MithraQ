@@ -384,3 +384,59 @@ function addonSettings(){const original=_addonOriginalSettings();const issues=ad
 const _addonOriginalHome=home; home=addonHome();
 const _addonOriginalSettings=settingsPanel; settingsPanel=addonSettings;
 setTimeout(()=>{if(document.querySelector('.app')&&!document.querySelector('.app').classList.contains('locked'))render();},0);
+
+/* MithraQ refined icon layer: swaps legacy glyphs for consistent inline SVG icons.
+   No buttons, labels, handlers, data or page structure are changed. */
+(function(){
+  const ICONS={
+    home:'<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-6h6v6"/>',
+    grid:'<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+    auction:'<path d="m7 7 10 10"/><path d="M8 6 6 8l10 10 2-2z"/><path d="M4 20h6"/>',
+    rupee:'<path d="M7 5h10M7 9h8M9 5c4 0 5 2 5 4 0 3-2 5-5 5l6 5"/>',
+    menu:'<path d="M4 7h16M4 12h16M4 17h16"/>',
+    user:'<circle cx="12" cy="8" r="3.2"/><path d="M5.5 20c.6-4 2.7-6 6.5-6s5.9 2 6.5 6"/>',
+    report:'<rect x="5" y="4" width="14" height="16" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+    search:'<circle cx="10.8" cy="10.8" r="6"/><path d="m16 16 4.5 4.5"/>',
+    settings:'<path d="M12 8.2a3.8 3.8 0 1 0 0 7.6 3.8 3.8 0 0 0 0-7.6Z"/><path d="m19.4 15 .2.1a1.7 1.7 0 0 1-1.7 3l-.2-.1a1.7 1.7 0 0 0-2.5 1.5v.2a1.7 1.7 0 0 1-3.4 0v-.2a1.7 1.7 0 0 0-2.5-1.5l-.2.1a1.7 1.7 0 1 1-1.7-3l.2-.1a1.7 1.7 0 0 0 0-3l-.2-.1a1.7 1.7 0 1 1 1.7-3l.2.1A1.7 1.7 0 0 0 11.8 7v-.2a1.7 1.7 0 0 1 3.4 0V7a1.7 1.7 0 0 0 2.5 1.5l.2-.1a1.7 1.7 0 1 1 1.7 3l-.2.1a1.7 1.7 0 0 0 0 3Z"/>',
+    edit:'<path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3Z"/><path d="m14.5 7.5 3 3"/>',
+    trash:'<path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5"/>',
+    plus:'<path d="M12 5v14M5 12h14"/>',
+    arrow:'<path d="M5 12h13"/><path d="m13 7 5 5-5 5"/>',
+    down:'<path d="M12 4v11"/><path d="m7 11 5 5 5-5"/><path d="M5 20h14"/>',
+    up:'<path d="M12 20V9"/><path d="m7 13 5-5 5 5"/><path d="M5 4h14"/>',
+    lock:'<rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><path d="M12 14v2"/>',
+    message:'<path d="M20 11.5a7.5 7.5 0 0 1-8 7.5 8.5 8.5 0 0 1-3.5-.8L4 20l1.7-3.5A7.3 7.3 0 0 1 4.5 12 7.5 7.5 0 0 1 12 4.5a7.5 7.5 0 0 1 8 7Z"/><path d="M8 12h.01M12 12h.01M16 12h.01"/>',
+    printer:'<path d="M6 9V4h12v5M6 17H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v6H6z"/><path d="M17 12h.01"/>',
+    receipt:'<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h4"/>',
+    clipboard:'<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M8 9h8M8 13h8M8 17h5"/>',
+    check:'<path d="m5 12 4 4L19 6"/>',
+    chart:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+    cloud:'<path d="M7 18h10a4 4 0 0 0 .6-7.95A6 6 0 0 0 6 8.5 4.5 4.5 0 0 0 7 18Z"/>',
+    info:'<circle cx="12" cy="12" r="9"/><path d="M12 10v6M12 7h.01"/>',
+    warning:'<path d="m12 4 9 16H3L12 4Z"/><path d="M12 9v5M12 17h.01"/>',
+    star:'<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9z"/>',
+    close:'<path d="m6 6 12 12M18 6 6 18"/>'
+  };
+  const map={
+    '⌂':'home','▣':'grid','♢':'auction','₹':'rupee','☰':'menu','♙':'user','▤':'report','⌕':'search','⚙':'settings',
+    '✎':'edit','⌫':'trash','+':'plus','→':'arrow','⬇️':'down','⬆️':'up','⬇':'down','⬆':'up','🔒':'lock','💬':'message','🖨️':'printer','🖨':'printer','🧾':'receipt','📋':'clipboard','✓':'check','📊':'chart','☁️':'cloud','☁':'cloud','⚠️':'warning','⚠':'warning','×':'close','!':'info','♛':'star'
+  };
+  function svg(name){return '<svg class="mq-svg" viewBox="0 0 24 24" aria-hidden="true">'+(ICONS[name]||ICONS.info)+'</svg>';}
+  function replaceTextNode(node){
+    const raw=node.nodeValue||''; const trimmed=raw.trim(); if(!trimmed)return;
+    let token=null,name=null,rest='';
+    for(const k of Object.keys(map)){if(trimmed===k||trimmed.startsWith(k+' ')){token=k;name=map[k];rest=trimmed.slice(k.length).replace(/^\s+/,'');break;}}
+    if(!name)return;
+    const span=document.createElement('span'); span.className='mq-icon-wrap'; span.innerHTML=svg(name)+(rest?' <span>'+rest+'</span>':'');
+    node.parentNode.replaceChild(span,node);
+  }
+  function scan(root){
+    const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,{acceptNode(n){
+      const p=n.parentElement; if(!p||p.closest('script,style,textarea,option,.mq-icon-wrap'))return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    }});
+    const nodes=[];let n;while(n=walker.nextNode())nodes.push(n);nodes.forEach(replaceTextNode);
+  }
+  function start(){scan(document.body);const obs=new MutationObserver(ms=>{for(const m of ms){m.addedNodes.forEach(n=>{if(n.nodeType===1)scan(n);else if(n.nodeType===3)replaceTextNode(n);});}});obs.observe(document.body,{childList:true,subtree:true});}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
+})();
