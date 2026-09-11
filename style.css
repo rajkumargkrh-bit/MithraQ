@@ -273,3 +273,7 @@ button:focus-visible .nav-icon,button:focus-visible .menu-sheet-icon,button:focu
 .security-panel{border:1px solid rgba(212,175,55,.25)}
 .security-panel hr{border:0;border-top:1px solid var(--border,#e7e7e7);width:100%;margin:12px 0}
 
+
+/* Android/WebView interaction safety */
+.bottom-nav,.bottom-nav *,.notification-btn,.notification-btn *{pointer-events:auto!important;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+button{touch-action:manipulation}

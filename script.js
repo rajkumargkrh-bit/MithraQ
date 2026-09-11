@@ -798,3 +798,61 @@ window.addEventListener('load',()=>{try{const s=JSON.parse(sessionStorage.getIte
   else safeBoot();
 })();
 
+
+/* ===== Emergency Interaction Fix: Android/WebView ===== */
+(function(){
+  const previousRender = render;
+  render = function(){
+    try {
+      return previousRender();
+    } catch (err) {
+      console.error('Render error:', err);
+      const app = document.getElementById('app');
+      if (app) app.innerHTML = '<div class="card"><h2 class="page-title">MithraQ</h2><div class="subtitle">The selected page could not be opened.</div><button class="btn gold full" type="button" onclick="goTab(\'home\')">Go to Home</button></div>';
+    }
+  };
+
+  window.goTab = function(nextTab){
+    tab = nextTab || 'home';
+    closeMenuSheet();
+    render();
+    try { window.scrollTo({top:0, behavior:'smooth'}); } catch(e) { window.scrollTo(0,0); }
+  };
+  window.openAppMenu = function(){ openMenuSheet(); };
+
+  function handleNav(target){
+    const button = target && target.closest ? target.closest('[data-tab]') : null;
+    if (button && button.dataset && button.dataset.tab) {
+      window.goTab(button.dataset.tab);
+      return true;
+    }
+    const menu = target && target.closest ? target.closest('#navMenuBtn') : null;
+    if (menu) { window.openAppMenu(); return true; }
+    return false;
+  }
+
+  // Works for normal browsers and Android WebView touch handling.
+  document.addEventListener('click', function(e){ handleNav(e.target); }, true);
+  document.addEventListener('touchend', function(e){
+    if (handleNav(e.target)) e.preventDefault();
+  }, {capture:true, passive:false});
+  document.addEventListener('pointerup', function(e){ handleNav(e.target); }, true);
+
+  // Explicitly expose frequently used inline handlers for restrictive WebViews.
+  [
+    'render','openMenuSheet','closeMenuSheet','newChit','createChit','editChit','updateChit','deleteChit',
+    'newMember','createMember','editMember','updateMember','deleteMember','collectMember','savePayment',
+    'editPayment','updatePayment','deletePayment','openHistory','loginAdmin','logoutAdmin','loginMember',
+    'showAdminLogin','showMemberLogin','openNotifications','addAnnouncement','publishAnnouncement',
+    'syncCloud','backupData','restoreData','saveSupabaseConfig','changeAdminPassword','saveSessionSecurity',
+    'openModal','closeModal','uiAlert','uiConfirm','goTab'
+  ].forEach(function(name){
+    try { if (typeof globalThis[name] === 'function') window[name] = globalThis[name]; } catch(e) {}
+  });
+
+  // Make sure navigation buttons are always interactive above app layers.
+  const nav = document.querySelector('.bottom-nav');
+  if (nav) { nav.style.pointerEvents = 'auto'; nav.style.touchAction = 'manipulation'; }
+
+  window.addEventListener('error', function(e){ console.error('MithraQ error:', e.error || e.message); });
+})();
