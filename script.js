@@ -250,6 +250,8 @@ function exportPendingCSV(month){const rows=[['Member','Phone','Chit','Expected'
 let auctionGroupValue='';
 let auctionRoundValue=1;
 let auctionTimer=null, auctionSeconds=0, auctionRunning=false;
+let auctionBids=[];
+let auctionLastSubmitted=null;
 function defaultDueDate(){const d=new Date();d.setMonth(d.getMonth()+1);d.setDate(5);return d.toISOString().slice(0,10);}
 function formatDMY(iso){if(!iso)return '—';const parts=String(iso).split('-');if(parts.length!==3)return esc(iso);const [y,m,d]=parts;return `${d}.${m}.${y}`;}
 function auctionFinance(c,bid,memberCount){
@@ -280,26 +282,43 @@ function auction(){
   if(!c){auctionGroupValue='';return auction();}
 
   const ms=membersForChit(c.id), records=state.auctions.filter(a=>String(a.chitId)===String(c.id));
-  const hasLastBid=!!(document.getElementById('auctionMember')?.value && document.getElementById('bid')?.value);
-  const lastMember=document.getElementById('auctionMember')?.selectedOptions?.[0]?.textContent||'';
-  const lastBid=document.getElementById('bid')?.value||'';
-  const winnerText=(!auctionRunning&&hasLastBid)?`<div class="auction-winner-live"><div class="winner-badge">🏆</div><div><span>WINNER — LAST BID</span><b>${esc(lastMember)}</b><strong>${money(lastBid)}</strong></div></div>`:'';
+  const last=auctionLastSubmitted;
+  const winnerText=(!auctionRunning&&last)?`<div class="auction-winner-live"><div class="winner-badge">🏆</div><div><span>WINNER — LAST BID</span><b>${esc(last.memberName)} • #${esc(last.memberNo||'—')}</b><strong>${money(last.bid)}</strong></div></div>`:'';
+  const bidHistory=auctionBids.length?`<div class="auction-bid-history"><div class="section no-margin"><h4 style="margin:0">Bid History</h4><span class="muted">${auctionBids.length} bid(s)</span></div>${auctionBids.map((b,i)=>`<div class="auction-bid-row"><span>#${i+1}</span><div style="flex:1"><b>${esc(b.memberName)}</b><div class="muted">#${esc(b.memberNo||'—')}</div></div><strong>${money(b.bid)}</strong></div>`).join('')}</div>`:'';
 
-  return `<div class="row"><div><h2 class="page-title">Live</h2><div class="subtitle">${esc(c.name)} • Live bidding</div></div><button class="action-btn" onclick="auctionGroupValue='';auctionRunning=false;clearInterval(auctionTimer);render()">← Chits</button></div>
+  return `<div class="row"><div><h2 class="page-title">Live</h2><div class="subtitle">${esc(c.name)} • Live bidding</div></div><button class="action-btn" onclick="auctionGroupValue='';auctionRunning=false;clearInterval(auctionTimer);auctionBids=[];auctionLastSubmitted=null;render()">← Chits</button></div>
   <div class="card auction-live-card">
     <div class="section no-margin"><div><h3>${esc(c.name)}</h3><span class="muted">${ms.length} members • ${money(c.amount)} chit value</span></div><span class="live-dot">● LIVE</span></div>
-    ${!auctionRunning&&!hasLastBid?`<div class="live-start-panel"><div class="live-big">LIVE</div><div class="muted">Press START to begin bidding.</div><button class="btn gold full" id="auctionTimerBtn" onclick="startAuctionTimer()">START</button></div>`:''}
-    ${auctionRunning||hasLastBid?`<div class="form">
-      <label class="field-label">Bidder / Last Bidder</label>
+    ${!auctionRunning&&!last?`<div class="live-start-panel"><div class="live-big">LIVE</div><div class="muted">Press START to begin bidding.</div><button class="btn gold full" id="auctionTimerBtn" onclick="startAuctionTimer()">START</button></div>`:''}
+    ${auctionRunning||last?`<div class="form">
+      <label class="field-label">Bidder</label>
       <select id="auctionMember">${ms.length?ms.map(m=>`<option value="${String(m.id)}">${esc(m.name)} • #${esc(m.memberNo||'—')}</option>`).join(''):'<option value="">No members in this group</option>'}</select>
       <label class="field-label">Bid amount ₹</label>
-      <input id="bid" type="number" min="1" max="${Number(c.amount||0)}" placeholder="Enter bid amount">
-      <div class="timer-card"><div><span>AUCTION TIME</span><strong id="timer">${String(Math.floor(auctionSeconds/60)).padStart(2,'0')}:${String(auctionSeconds%60).padStart(2,'0')}</strong></div><button class="timer-btn" id="auctionTimerBtn" onclick="startAuctionTimer()">${auctionRunning?'STOP':'START'}</button></div>
+      <div class="bid-submit-row"><input id="bid" type="number" min="1" max="${Number(c.amount||0)}" placeholder="Enter bid amount" onkeydown="if(event.key==='Enter'){event.preventDefault();submitAuctionBid();}"><button class="btn submit-bid-btn" type="button" onclick="submitAuctionBid()">SUBMIT</button></div>
+      ${bidHistory}
+      <div class="timer-card"><div><span>AUCTION TIME</span><strong id="timer">${String(Math.floor(auctionSeconds/60)).padStart(2,'0')}:${String(auctionSeconds%60).padStart(2,'0')}</strong></div><button class="timer-btn" id="auctionTimerBtn" onclick="startAuctionTimer()">${auctionRunning?'STOP':'STOP'}</button></div>
       ${winnerText}
     </div>`:''}
   </div>
   <div class="section"><h3>Round History</h3><span class="muted">${records.length} auction record(s)</span></div>
   <div class="list">${records.length?records.map(a=>auctionRecordHtml(a,c)).join(''):'<div class="empty">No auction records for this group yet.</div>'}</div>`;
+}
+function submitAuctionBid(){
+  if(!auctionRunning)return uiAlert('Press START to begin bidding.');
+  const memberSel=document.getElementById('auctionMember'),bidInput=document.getElementById('bid');
+  const opt=memberSel&&memberSel.selectedIndex>-1?memberSel.options[memberSel.selectedIndex]:null;
+  const bid=Number(bidInput?.value||0),c=chitById(auctionGroupValue);
+  if(!opt||!opt.value)return uiAlert('Select a bidder.');
+  if(!bid)return uiAlert('Enter the bid amount.');
+  if(bid>Number(c?.amount||0))return uiAlert('Bid cannot be greater than the chit value.');
+  const m=state.members.find(x=>String(x.id)===String(opt.value));
+  if(!m)return uiAlert('Selected member is not available.');
+  const item={memberId:m.id,memberName:m.name,memberNo:m.memberNo||'—',bid};
+  auctionBids.push(item);
+  auctionLastSubmitted=item;
+  bidInput.value='';
+  render();
+  setTimeout(()=>document.getElementById('bid')?.focus(),0);
 }
 function auctionRecordHtml(a,c){
   const bid=Number(a.bid||0),chitAmount=Number(a.chitAmount||c.amount||0);
@@ -314,6 +333,7 @@ function auctionRecordHtml(a,c){
       <div><span>CHIT AMOUNT</span><b>${money(chitAmount)}</b></div>
       <div><span>AUCTION</span><b>${money(bid)}</b></div>
       <div><span>DIVI.</span><b>${money(fin.dividendPerMember)}</b></div>
+      <div><span>TAKE AMOUNT</span><b>${money(Math.max(0,chitAmount-bid))}</b></div>
       <div class="payable-cell"><span>PAYABLE</span><b>${money(fin.payable)}</b></div>
     </div>
     <div class="auction-due">Due date: <b>${formatDMY(a.dueDate)}</b></div>
@@ -328,8 +348,8 @@ function startAuctionTimer(){
   if(!auctionRunning){
     auctionRunning=true;
     auctionSeconds=0;
-    if(t)t.textContent='00:00';
-    btn.textContent='STOP';
+    auctionBids=[];
+    auctionLastSubmitted=null;
     clearInterval(auctionTimer);
     auctionTimer=setInterval(()=>{
       auctionSeconds++;
@@ -341,27 +361,21 @@ function startAuctionTimer(){
   }else{
     auctionRunning=false;
     clearInterval(auctionTimer);
-    const memberSel=document.getElementById('auctionMember'),bidInput=document.getElementById('bid');
-    const opt=memberSel&&memberSel.selectedIndex>-1?memberSel.options[memberSel.selectedIndex]:null;
-    if(opt&&opt.value&&bidInput&&Number(bidInput.value)>0){
-      if(Number(bidInput.value)>Number(chitById(auctionGroupValue)?.amount||0)){
-        auctionRunning=true;
-        return uiAlert('Bid cannot be greater than the chit value.');
-      }
-      const c=chitById(auctionGroupValue);
-      const m=state.members.find(x=>String(x.id)===String(opt.value));
-      if(c&&m){
-        const bid=Number(bidInput.value);
-        const fin=auctionFinance(c,bid);
-        const rec={id:Date.now(),chit:c.name,chitId:c.id,member:m.name,memberId:m.id,bid,round:'Round '+auctionRoundValue,chitAmount:fin.chitAmount,dividend:fin.discount,auctionDiscount:fin.discount,commissionPct:Number(c.commission||0),commissionAmt:fin.commissionAmt,dividendPool:fin.dividendPool,shareCount:fin.shareCount,monthly:fin.monthly,dividendPerMember:fin.dividendPerMember,payable:fin.payable,dueDate:defaultDueDate(),date:new Date().toLocaleDateString('en-IN'),createdAt:new Date().toISOString()};
-        state.auctions.unshift(rec); save();
-      }
-      render();
-      uiAlert('Bidding stopped. '+opt.textContent+' is the winner with the last bid of ₹'+bidInput.value+'.');
-    }else{
-      render();
-      uiAlert('Bidding stopped. Select the last bidder and enter the last bid amount.');
+    const last=auctionLastSubmitted;
+    if(!last){
+      auctionRunning=true;
+      return uiAlert('Submit at least one bid before stopping the auction.');
     }
+    const c=chitById(auctionGroupValue);
+    const m=state.members.find(x=>String(x.id)===String(last.memberId));
+    if(c&&m){
+      const bid=Number(last.bid);
+      const fin=auctionFinance(c,bid);
+      const rec={id:Date.now(),chit:c.name,chitId:c.id,member:m.name,memberId:m.id,bid,round:'Round '+auctionRoundValue,chitAmount:fin.chitAmount,dividend:fin.discount,auctionDiscount:fin.discount,commissionPct:Number(c.commission||0),commissionAmt:fin.commissionAmt,dividendPool:fin.dividendPool,shareCount:fin.shareCount,monthly:fin.monthly,dividendPerMember:fin.dividendPerMember,payable:fin.payable,dueDate:defaultDueDate(),date:new Date().toLocaleDateString('en-IN'),createdAt:new Date().toISOString(),bidHistory:auctionBids.map(x=>({...x}))};
+      state.auctions.unshift(rec); save();
+    }
+    render();
+    uiAlert('Auction stopped. '+last.memberName+' is the winner with the last bid of ₹'+last.bid+'.');
   }
 }
 function previewAuctionDividend(chitId){const c=chitById(chitId)||chitById(auctionGroupValue),el=document.getElementById('auctionDividendPreview');if(!el||!c)return;const bid=Number(document.getElementById('bid')?.value||0);if(!bid){el.innerHTML='<div class="muted">Enter the bid to calculate dividend automatically.</div>';return;}const fin=auctionFinance(c,bid,membersForChit(c.id).length);el.innerHTML=`<div class="row" style="margin:0 0 8px"><b>Automatic Dividend Calculation</b><span class="badge active">${fin.shareCount} SHARES</span></div><div class="muted" style="line-height:1.7">Bid/discount: <b>${money(bid)}</b> · Commission: <b>${money(fin.commissionAmt)}</b><br>Dividend pool: <b>${money(fin.dividendPool)}</b> ÷ ${fin.shareCount} members = <b>${money(fin.dividendPerMember)}</b> per member</div><div style="display:flex;justify-content:space-between;margin-top:10px;padding-top:10px;border-top:1px solid #dfe9e4"><span>Monthly installment</span><b>${money(fin.monthly)}</b></div><div style="display:flex;justify-content:space-between;margin-top:6px"><span>Payable after dividend</span><b>${money(fin.payable)}</b></div>`;}

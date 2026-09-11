@@ -245,3 +245,4 @@ button:focus-visible .nav-icon,button:focus-visible .menu-sheet-icon,button:focu
 .auction-winner-live span{display:block;font-size:10px;font-weight:800;color:#087052;letter-spacing:.7px}
 .auction-winner-live b{display:block;margin-top:3px}
 .auction-winner-live strong{display:block;color:var(--green);font-size:20px;margin-top:2px}
+.bid-submit-row{display:flex;gap:10px;align-items:stretch}.bid-submit-row input{flex:1;min-width:0}.submit-bid-btn{min-width:118px;padding:0 18px}.auction-bid-history{margin-top:12px;border:1px solid #dfe9e4;border-radius:16px;padding:12px;background:#fbfdfc}.auction-bid-row{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid #edf2ef}.auction-bid-row:last-child{border-bottom:0}.auction-bid-row>span{width:28px;color:#6c7f79;font-size:12px}.auction-bid-row strong{color:#056b4f}@media(max-width:420px){.submit-bid-btn{min-width:100px;padding:0 12px}}
