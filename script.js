@@ -12,8 +12,14 @@ const KEY="mithraq_v2_groupwise";
 const SUPA_CFG_KEY="mithraq_supabase_config_v1";
 let supa=null, supaStatus="Not connected", syncBusy=false;
 function getSupabaseConfig(){try{return JSON.parse(localStorage.getItem(SUPA_CFG_KEY)||"null")}catch(e){return null}}
-function initSupabase(){const c=getSupabaseConfig();if(!c?.url||!c?.anonKey||!window.supabase){supa=null;supaStatus=window.supabase?"Not configured":"Library loading";return false}try{supa=window.supabase.createClient(c.url,c.anonKey);supaStatus="Connected";return true}catch(e){supa=null;supaStatus="Invalid configuration";return false}}
+function initSupabase(){
+  const c=getSupabaseConfig();
+  if(!c?.url||!c?.anonKey){supa=null;supaStatus="Not configured";return false}
+  if(!/^https:\/\/[^ ]+\.supabase\.co$/.test(c.url)){supa=null;supaStatus="Invalid project URL";return false}
+  supa={url:c.url,anonKey:c.anonKey};supaStatus="Connected";return true
+}
 initSupabase();
+
 let state=(()=>{try{return JSON.parse(localStorage.getItem(KEY)||'null')||{chits:[],members:[],auctions:[],payments:[]}}catch(e){return {chits:[],members:[],auctions:[],payments:[]}}})();
 // Migrate old MithraQ data if it exists.
 if(!state.chits.length && !state.members.length){try{const old=JSON.parse(localStorage.getItem('mithraq_v1')||'null');if(old)state=old;}catch(e){}}
@@ -22,8 +28,37 @@ state.auctions=Array.isArray(state.auctions)?state.auctions:[]; state.payments=A
 let tab="home";
 let collectionMonthValue=new Date().toISOString().slice(0,7);
 function save(){localStorage.setItem(KEY,JSON.stringify(state));}
-async function pushToSupabase(){if(!supa||syncBusy)return false;syncBusy=true;try{const payload={id:"main",data:state,updated_at:new Date().toISOString()};const {error}=await supa.from("mithraq_data").upsert(payload,{onConflict:"id"});if(error)throw error;supaStatus="Synced";return true}catch(e){supaStatus="Sync error: "+(e.message||"unknown");return false}finally{syncBusy=false}}
-async function pullFromSupabase(){if(!supa||syncBusy)return false;syncBusy=true;try{const {data,error}=await supa.from("mithraq_data").select("data,updated_at").eq("id","main").maybeSingle();if(error)throw error;if(data?.data){state={chits:data.data.chits||[],members:data.data.members||[],auctions:data.data.auctions||[],payments:data.data.payments||[]};save();supaStatus="Downloaded";render();return true}supaStatus="Connected (no cloud data yet)";return false}catch(e){supaStatus="Sync error: "+(e.message||"unknown");return false}finally{syncBusy=false}}
+async function supabaseFetch(path,options={}){
+  if(!supa) return null;
+  const headers=Object.assign({"apikey":supa.anonKey,"Authorization":"Bearer "+supa.anonKey,"Content-Type":"application/json","Accept":"application/json"},options.headers||{});
+  const r=await fetch(supa.url+"/rest/v1/"+path,Object.assign({},options,{headers}));
+  const text=await r.text();
+  let data=null; try{data=text?JSON.parse(text):null}catch(e){data=text}
+  if(!r.ok){const msg=(data&&data.message)||data||("HTTP "+r.status);throw new Error(String(msg))}
+  return data;
+}
+async function pushToSupabase(){
+  if(!supa||syncBusy)return false;syncBusy=true;
+  try{
+    const payload={id:"main",data:state,updated_at:new Date().toISOString()};
+    await supabaseFetch("mithraq_data?on_conflict=id",{method:"POST",headers:{"Prefer":"resolution=merge-duplicates,return=minimal"},body:JSON.stringify(payload)});
+    supaStatus="Synced";return true;
+  }catch(e){supaStatus="Sync error: "+(e.message||"unknown");return false}
+  finally{syncBusy=false}
+}
+async function pullFromSupabase(){
+  if(!supa||syncBusy)return false;syncBusy=true;
+  try{
+    const rows=await supabaseFetch("mithraq_data?select=data,updated_at&id=eq.main&limit=1",{method:"GET"});
+    const row=Array.isArray(rows)?rows[0]:rows;
+    if(row?.data){
+      state={chits:row.data.chits||[],members:row.data.members||[],auctions:row.data.auctions||[],payments:row.data.payments||[]};
+      _localSave();supaStatus="Downloaded";render();return true;
+    }
+    supaStatus="Connected (no cloud data yet)";return false;
+  }catch(e){supaStatus="Sync error: "+(e.message||"unknown");return false}
+  finally{syncBusy=false}
+}
 async function syncCloud(mode="push"){if(!initSupabase()){alert("Supabase is not configured. Open Settings → Supabase Live Sync and enter your Project URL + anon key.");return}const ok=mode==='pull'?await pullFromSupabase():await pushToSupabase();alert(ok?(mode==='pull'?'Cloud data downloaded successfully.':'Data uploaded to Supabase successfully.'):'Supabase sync failed. Check the configuration and RLS policy.');render()}
 function supabasePanel(){const c=getSupabaseConfig()||{};return `<div class="card"><h3 style="margin-top:0">☁️ Supabase Live Sync</h3><div class="muted">Status: <b>${esc(supaStatus)}</b></div><div class="form"><input id="supaUrl" value="${esc(c.url||'')}" placeholder="Supabase Project URL"><input id="supaAnon" value="${esc(c.anonKey||'')}" placeholder="Supabase anon/public key" type="password"><button class="btn gold full" onclick="saveSupabaseConfig()">Save & Connect</button></div><div class="backup-grid"><button class="btn" onclick="syncCloud('pull')">⬇️ Download Cloud</button><button class="btn" onclick="syncCloud('push')">⬆️ Upload to Cloud</button></div><div class="backup-note">Use only the Supabase <b>anon/public</b> key in this browser. Never paste the service-role/secret key here. Run the included <b>supabase_phase10.sql</b> once in Supabase SQL Editor before syncing.</div></div>`}
 function saveSupabaseConfig(){const url=(document.getElementById('supaUrl')?.value||'').trim().replace(/\/$/,''),anonKey=(document.getElementById('supaAnon')?.value||'').trim();if(!/^https:\/\/[^ ]+\.supabase\.co$/.test(url)||anonKey.length<20)return alert('Enter a valid Supabase Project URL and anon/public key.');localStorage.setItem(SUPA_CFG_KEY,JSON.stringify({url,anonKey}));initSupabase();alert('Supabase connection saved.');render()}
@@ -115,11 +150,20 @@ function renderCollectionGroup(){const id=document.getElementById('collectionChi
 function reports(){const col=state.payments.reduce((s,p)=>s+Number(p.amount||0),0);return `<h2 class="page-title">Reports</h2><div class="subtitle">Group-wise overview</div><div class="grid"><div class="card"><div class="stat-label">CHITS</div><div class="stat-value">${state.chits.length}</div></div><div class="card"><div class="stat-label">MEMBERS</div><div class="stat-value">${state.members.length}</div></div><div class="card"><div class="stat-label">COLLECTION</div><div class="stat-value">${money(col)}</div></div><div class="card"><div class="stat-label">AUCTIONS</div><div class="stat-value">${state.auctions.length}</div></div></div>${state.chits.map(c=>`<div class="card report-group"><div class="row"><b>${esc(c.name)}</b><span class="badge active">${membersForChit(c.id).length} MEMBERS</span></div><div class="muted">${c.type==='dividend'?'Dividend':'Fixed'} • Monthly ${money(c.monthly||0)} • Auctions ${state.auctions.filter(a=>String(a.chitId)===String(c.id)).length}</div></div>`).join('')}`;}
 function openModal(title,body){document.getElementById('modalTitle').textContent=title;document.getElementById('modalBody').innerHTML=body;document.getElementById('modal').classList.remove('hidden');}
 function closeModal(){document.getElementById('modal').classList.add('hidden');}
-window.addEventListener('load',()=>{authUser=getAuth();if(authUser)showApp();else showLogin();});
-document.getElementById('modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();});
-const _localSave=save; save=function(){_localSave(); if(supa) pushToSupabase();};
-document.querySelectorAll('.bottom-nav button').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;render();});
-render();
+const _localSave=save; save=function(){_localSave();if(supa)pushToSupabase();};
+function bootMithraQ(){
+  try{
+    authUser=getAuth();
+    const modal=document.getElementById('modal');
+    if(modal)modal.addEventListener('click',e=>{if(e.target.id==='modal')closeModal();});
+    document.querySelectorAll('.bottom-nav button').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;render();});
+    if(authUser)showApp();else showLogin();
+  }catch(e){
+    const root=document.getElementById('authRoot');
+    if(root)root.innerHTML='<div class="auth-screen"><div class="auth-card"><h1>MithraQ</h1><p class="auth-sub">App could not start.</p><div class="auth-note">'+esc(e?.message||'Unknown error')+'</div><button class="btn gold full" onclick="location.reload()">Reload</button></div></div>';
+  }
+}
+window.addEventListener('load',bootMithraQ);
 
 /* ===== MithraQ Professional Phase 3 ===== */
 function memberPayments(memberId){return state.payments.filter(p=>String(p.memberId)===String(memberId)).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));}
