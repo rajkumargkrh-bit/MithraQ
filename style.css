@@ -239,3 +239,134 @@ button{cursor:pointer}
 .avatar{background:linear-gradient(145deg,#E8F5EC,#D4EBDC);border-color:#C9E2D2}
 .progress i{background:linear-gradient(90deg,#08754B,#57AE7D)}
 .leaf-accent{position:absolute;pointer-events:none;opacity:.14;font-size:76px;line-height:1}
+
+/* ================= MITHRAQ STYLE #2 — GREEN / NATURE ================= */
+:root{
+ --navy:#07543B;
+ --navy2:#0A7650;
+ --navy3:#159468;
+ --gold:#C99A32;
+ --gold2:#E8C764;
+ --cream:#F3F9F1;
+ --surface:#FFFFFF;
+ --white:#FFFFFF;
+ --text:#12382C;
+ --muted:#71877D;
+ --line:#D9E9DE;
+ --green:#07945B;
+ --green-bg:#E7F6EC;
+ --red:#E35D63;
+ --orange:#D99A32;
+ --orange-bg:#FFF3D9;
+ --shadow:0 12px 35px rgba(15,77,52,.10);
+ --shadow2:0 7px 22px rgba(15,77,52,.08);
+}
+html,body{background:#EAF4EA!important;color:var(--text)!important}
+body{
+ background:
+ radial-gradient(circle at 95% 5%,rgba(101,180,125,.18),transparent 22%),
+ radial-gradient(circle at 5% 92%,rgba(200,224,183,.32),transparent 28%),
+ linear-gradient(135deg,#F9FCF7,#EDF7EC)!important;
+}
+.app{
+ background:linear-gradient(180deg,#FFFFFF 0%,#F5FAF3 100%)!important;
+ box-shadow:0 0 80px rgba(20,85,55,.12)!important;
+}
+.topbar{
+ min-height:88px!important;
+ background:
+ radial-gradient(circle at 90% 0%,rgba(211,239,192,.38),transparent 23%),
+ linear-gradient(135deg,#FFFFFF,#F7FCF5)!important;
+ border-bottom:1px solid #D7E9DA!important;
+}
+.topbar h1{color:#07543B!important;font-size:25px!important}
+.topbar p{color:#668276!important;font-size:9px!important;letter-spacing:.45px}
+.topbar:after{background:linear-gradient(90deg,transparent,#C99A32,transparent)!important}
+.brand-mark{
+ color:#FFFFFF!important;
+ background:linear-gradient(145deg,#0A9A60,#05633F)!important;
+ border:1px solid rgba(201,154,50,.55)!important;
+ box-shadow:inset 0 1px rgba(255,255,255,.35),0 7px 20px rgba(5,99,63,.20)!important;
+ font-size:25px!important;
+}
+.content{background:transparent!important}
+.page-title{color:#12382C!important}
+.subtitle{color:#71877D!important}
+.hero{
+ border:1px solid #BFDCC7!important;
+ background:
+ radial-gradient(circle at 88% 8%,rgba(208,238,193,.35),transparent 24%),
+ radial-gradient(circle at 8% 100%,rgba(109,187,132,.20),transparent 34%),
+ linear-gradient(135deg,#08764D,#0B9A61 70%,#08704A)!important;
+ box-shadow:0 16px 42px rgba(8,107,70,.18)!important;
+}
+.hero small{color:#E7F4DF!important}
+.hero h2{color:#FFFFFF!important}
+.card{
+ background:rgba(255,255,255,.94)!important;
+ border:1px solid #DCEBE0!important;
+ color:#173C30!important;
+ box-shadow:var(--shadow2)!important;
+}
+.card:hover{border-color:#A9D0B6!important;box-shadow:0 12px 30px rgba(15,77,52,.12)!important}
+.stat-label{color:#7A8F86!important}
+.stat-value{color:#07543B!important}
+.section h3{color:#12382C!important}
+.chit-title{color:#07543B!important}
+.muted{color:#7A8F86!important}
+.badge.active{background:#E4F6E9!important;color:#078451!important;border:1px solid #C8E8D2!important}
+.badge.pending{background:#FFF2D8!important;color:#B77914!important;border:1px solid #F1DEAF!important}
+.progress{background:#E7EFE9!important}
+.progress i{background:linear-gradient(90deg,#0A8D59,#5BBC7C)!important}
+.avatar{background:linear-gradient(145deg,#E9F6EC,#D6ECDC)!important;border-color:#BFDCC7!important;color:#08744C!important}
+.btn{background:linear-gradient(135deg,#0A7650,#087D53)!important;color:#FFFFFF!important;border:1px solid #08704A!important}
+.btn.gold{background:linear-gradient(135deg,#E9C867,#BD8D28)!important;color:#163126!important;border-color:#D0A33A!important}
+.btn.light{background:#F1F7F1!important;color:#07543B!important;border:1px solid #D5E7D9!important}
+.quick{
+ background:linear-gradient(145deg,#FFFFFF,#F5FAF4)!important;
+ border:1px solid #D7E9DB!important;
+ color:#12382C!important;
+}
+.quick b{color:#0A8B58!important}
+.empty{background:#FBFDFB!important;border-color:#D5E6D9!important;color:#82958D!important}
+.form input,.form select,.search{
+ background:#FFFFFF!important;color:#173C30!important;border-color:#D3E4D7!important;
+}
+.form input::placeholder,.search::placeholder{color:#93A49C!important}
+.form input:focus,.form select:focus,.search:focus{border-color:#0A8B58!important;box-shadow:0 0 0 3px rgba(10,139,88,.10)!important}
+.bottom-nav{
+ background:rgba(255,255,255,.97)!important;
+ border-top:1px solid #D5E6D9!important;
+ box-shadow:0 -10px 30px rgba(15,77,52,.10)!important;
+}
+.bottom-nav button{color:#80928A!important}
+.bottom-nav button.active{color:#08764D!important;background:#EDF8EF!important}
+.bottom-nav button.active:after{background:#C99A32!important}
+.modal{background:rgba(3,45,29,.40)!important}
+.modal-card{
+ background:#FFFFFF!important;
+ border:1px solid #CFE3D4!important;
+ color:#173C30!important;
+}
+.modal-head h3{color:#07543B!important}
+.modal-head button{background:#EEF6EF!important;color:#07543B!important}
+.metric{border-color:#E2EEE4!important}
+.metric span{color:#7A8F86!important}.metric b{color:#12382C!important}
+.table-card .table-title{border-color:#DCEBE0!important;color:#12382C!important}
+.tx{border-color:#E7EFE8!important}
+.chip{background:#EAF6ED!important;color:#08744C!important;border:1px solid #D1E8D7!important}
+.leaf-accent{color:#159468!important;opacity:.12!important}
+@media(min-width:900px){
+ .app{width:min(100%,1180px)!important;min-height:calc(100vh - 40px)!important;margin:20px auto!important;border-radius:24px!important;padding-bottom:0!important}
+ .content{padding:30px 30px 35px 270px!important;min-height:calc(100vh - 108px)!important}
+ .bottom-nav{
+   position:absolute!important;left:0;top:88px;bottom:0;width:240px!important;
+   display:flex!important;flex-direction:column!important;justify-content:flex-start!important;
+   padding:22px 15px!important;border-top:0!important;border-right:1px solid #D8E9DB!important;
+ }
+ .bottom-nav button{display:flex!important;align-items:center!important;gap:12px!important;text-align:left!important;padding:13px 15px!important;margin:3px 0!important}
+ .bottom-nav button span{display:inline!important;font-size:12px!important}
+ .bottom-nav button.active{background:linear-gradient(90deg,#E6F5E9,#F6FBF6)!important;border-left:3px solid #0A8B58!important}
+ .bottom-nav button.active:after{display:none!important}
+ .grid{grid-template-columns:repeat(4,1fr)!important}
+}
