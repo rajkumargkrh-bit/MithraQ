@@ -164,3 +164,19 @@ body{background:radial-gradient(circle at top,#eaf5ef 0,#eef5f0 38%,#e8f1eb 100%
 @media(max-width:430px){
   .topbar{padding:14px 16px}.brand-mark{width:52px;height:52px}.topbar h1{font-size:24px}.content{padding:20px 15px}.bottom-nav{width:calc(100% - 18px);bottom:9px}
 }
+
+/* ===== MithraQ Branded Popup UI — replaces browser alert/confirm ===== */
+.notice-layer{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:22px;box-sizing:border-box}
+.notice-layer.hidden{display:none}
+.notice-backdrop{position:absolute;inset:0;background:rgba(3,35,28,.58);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);animation:noticeFade .16s ease-out}
+.notice-card{position:relative;width:min(100%,390px);box-sizing:border-box;background:linear-gradient(180deg,#fffef9 0%,#f4faf6 100%);border:1px solid #dfd3a9;border-top:3px solid var(--brand-gold);border-radius:24px;padding:24px 22px 20px;box-shadow:0 26px 70px rgba(1,48,37,.32),0 5px 18px rgba(1,48,37,.12);text-align:center;animation:noticePop .18s ease-out}
+.notice-icon{width:48px;height:48px;margin:0 auto 12px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:linear-gradient(145deg,#dff3e9,#fff3c9);border:1px solid #dfcf91;color:var(--brand-emerald);font-size:22px;font-weight:900;box-shadow:0 8px 18px rgba(4,63,48,.10)}
+.notice-title{font-size:20px;font-weight:800;color:var(--brand-emerald);margin-bottom:8px}
+.notice-message{font-size:15px;line-height:1.55;color:#53655e;white-space:pre-line;word-break:break-word;margin:0 auto 20px;max-height:42vh;overflow:auto}
+.notice-actions{display:flex;gap:10px;justify-content:center}
+.notice-actions .btn{min-width:120px;margin:0}
+.notice-cancel{background:#edf4f0!important;color:var(--brand-emerald)!important;border:1px solid #d8e1db!important;box-shadow:none!important}
+.notice-ok{min-width:150px!important}
+@keyframes noticePop{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes noticeFade{from{opacity:0}to{opacity:1}}
+@media(max-width:430px){.notice-layer{padding:18px}.notice-card{border-radius:22px;padding:22px 18px 18px}.notice-title{font-size:19px}.notice-message{font-size:14px}.notice-actions .btn{min-width:108px}}
