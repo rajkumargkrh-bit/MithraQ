@@ -4,11 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MithraQ — Together We Grow</title>
-  <link rel="stylesheet" href="style.css?v=20260911-history-fix-01">
+  <link rel="stylesheet" href="style.css?v=20260911-phase15-security">
   <link rel="icon" type="image/png" sizes="192x192" href="assets/mithra-icon-192.png">
   <link rel="apple-touch-icon" href="assets/mithra-icon-192.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0b7055">
 </head>
 <body>
+  <div id="offlineBanner" class="offline-banner hidden">📴 You are offline. Changes will stay on this device until you reconnect.</div>
+  <div id="installPrompt" class="install-prompt hidden"><div><b>Install MithraQ</b><span>Get faster access and an app-like experience.</span></div><button class="btn gold" id="installBtn">Install</button><button class="install-close" id="installClose" aria-label="Close">×</button></div>
   <div class="app">
     <div id="authRoot"></div>
     <header class="topbar">
@@ -46,6 +50,6 @@
     </nav>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="script.js?v=20260911-history-fix-01"></script>
+  <script src="script.js?v=20260911-phase15-security"></script>
 </body>
 </html>

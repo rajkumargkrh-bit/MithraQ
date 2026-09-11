@@ -742,3 +742,41 @@ const __baseRenderPhase13=render;render=function(){__baseRenderPhase13();ensureN
 setTimeout(()=>{ensureNotificationButton();generateSmartNotifications()},200);
 const __baseSettingsPhase13 = typeof settings==='function' ? settings : null;
 if(__baseSettingsPhase13){settings=function(){const out=__baseSettingsPhase13();return out.replace(/(<\/div>\s*)$/,'<button class="btn gold announcement-btn" onclick="addAnnouncement()">📢 Send Admin Announcement</button>$1')}}
+
+/* ===== Phase 15: Security & Production Readiness ===== */
+const SESSION_KEY='mithraq_secure_session_v1';
+const SESSION_MIN_KEY='mithraq_session_minutes_v1';
+let sessionTimer=null;
+function sessionMinutes(){return Math.max(5,Math.min(1440,Number(localStorage.getItem(SESSION_MIN_KEY)||30)))}
+function startSecureSession(role){const expiresAt=Date.now()+sessionMinutes()*60*1000;sessionStorage.setItem(SESSION_KEY,JSON.stringify({role,expiresAt}));clearTimeout(sessionTimer);sessionTimer=setTimeout(()=>forceSessionLogout(),sessionMinutes()*60*1000);}
+function touchSecureSession(){try{const s=JSON.parse(sessionStorage.getItem(SESSION_KEY)||'null');if(!s||Date.now()>s.expiresAt)return forceSessionLogout();s.expiresAt=Date.now()+sessionMinutes()*60*1000;sessionStorage.setItem(SESSION_KEY,JSON.stringify(s));clearTimeout(sessionTimer);sessionTimer=setTimeout(()=>forceSessionLogout(),sessionMinutes()*60*1000)}catch(e){}}
+function forceSessionLogout(){sessionStorage.removeItem(SESSION_KEY);authUser=null;currentRole='admin';currentMemberId=null;window.__memberLoginMode=false;if(document.getElementById('authRoot'))showLogin();}
+['click','keydown','touchstart'].forEach(ev=>document.addEventListener(ev,()=>{if(authUser)touchSecureSession()},{passive:true}));
+const __phase15AdminLogin=loginAdmin;loginAdmin=async function(){await __phase15AdminLogin();if(authUser)startSecureSession('admin');};
+const __phase15MemberLogin=loginMember;loginMember=async function(){await __phase15MemberLogin();if(authUser)startSecureSession('member');};
+const __phase15Logout=logoutAdmin;logoutAdmin=function(){sessionStorage.removeItem(SESSION_KEY);__phase15Logout();};
+function changeAdminPassword(){const current=document.getElementById('secCurrentPass')?.value||'',next=document.getElementById('secNewPass')?.value||'',confirmPass=document.getElementById('secConfirmPass')?.value||'',a=getAuth();if(!a)return uiAlert('Administrator account not found.');if(next.length<8)return uiAlert('Use at least 8 characters for the new password.');if(next!==confirmPass)return uiAlert('New passwords do not match.');authHash(current).then(h=>{if(h!==a.hash)return uiAlert('Current password is incorrect.');authHash(next).then(nh=>{a.hash=nh;a.updatedAt=new Date().toISOString();localStorage.setItem(AUTH_KEY,JSON.stringify(a));['secCurrentPass','secNewPass','secConfirmPass'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});uiAlert('Admin password changed successfully.','Security Updated');});});}
+function saveSessionSecurity(){const v=Number(document.getElementById('sessionMinutes')?.value||30);if(v<5||v>1440)return uiAlert('Session timeout must be between 5 and 1440 minutes.');localStorage.setItem(SESSION_MIN_KEY,String(v));touchSecureSession();uiAlert('Session security updated.','Security Updated');}
+function phase15SecurityPanel(){return `<div class="card role-panel security-panel"><h3>🛡️ Advanced Security</h3><div class="muted">Production-ready controls for sessions and administrator credentials.</div><div class="form"><label class="field-label">Session timeout (minutes)</label><input id="sessionMinutes" type="number" min="5" max="1440" value="${sessionMinutes()}"><button class="btn full" onclick="saveSessionSecurity()">Save Session Timeout</button><hr><label class="field-label">Current password</label><input id="secCurrentPass" type="password" autocomplete="current-password"><label class="field-label">New password (min 8 characters)</label><input id="secNewPass" type="password" autocomplete="new-password"><label class="field-label">Confirm new password</label><input id="secConfirmPass" type="password" autocomplete="new-password"><button class="btn gold full" onclick="changeAdminPassword()">🔑 Change Admin Password</button></div><div class="backup-note">For real multi-device password reset and account recovery, configure Supabase Auth and email delivery in your production project.</div></div>`;}
+const __phase15Settings=settingsPanel;settingsPanel=function(){return __phase15Settings()+phase15SecurityPanel();};
+window.addEventListener('load',()=>{try{const s=JSON.parse(sessionStorage.getItem(SESSION_KEY)||'null');if(authUser&&(!s||Date.now()>s.expiresAt)){authUser=null;showLogin();}else if(authUser&&s)startSecureSession(s.role);}catch(e){}});
+
+/* ===== Phase 16: PWA, Offline & Install Experience ===== */
+(function initPWA(){
+  let deferredInstallPrompt=null;
+  const installBox=()=>document.getElementById('installPrompt');
+  const showInstall=()=>{const box=installBox();if(box&&!localStorage.getItem('mithraq_install_dismissed'))box.classList.remove('hidden');};
+  const hideInstall=()=>{const box=installBox();if(box)box.classList.add('hidden');};
+  function updateNetwork(){const b=document.getElementById('offlineBanner');if(!b)return;b.classList.toggle('hidden',navigator.onLine);}
+  window.addEventListener('online',()=>{updateNetwork();if(typeof syncCloud==='function')try{syncCloud();}catch(e){}});
+  window.addEventListener('offline',updateNetwork);
+  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstallPrompt=e;showInstall();});
+  window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;hideInstall();localStorage.removeItem('mithraq_install_dismissed');});
+  window.addEventListener('load',()=>{
+    updateNetwork();
+    if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').catch(()=>{});}
+    const btn=document.getElementById('installBtn'),close=document.getElementById('installClose');
+    if(btn)btn.addEventListener('click',async()=>{if(!deferredInstallPrompt){showInstall();return;}deferredInstallPrompt.prompt();await deferredInstallPrompt.userChoice;deferredInstallPrompt=null;hideInstall();});
+    if(close)close.addEventListener('click',()=>{localStorage.setItem('mithraq_install_dismissed','1');hideInstall();});
+  });
+})();
