@@ -76,7 +76,7 @@ function memberMonthly(m,c){const x=(m?.memberships||[]).find(v=>String(v.chitId
 function normalizeMember(m){if(!Array.isArray(m.chitIds))m.chitIds=[];if(!Array.isArray(m.memberships))m.memberships=m.chitIds.map(id=>({chitId:id,monthly:Number(m.monthly||chitById(id)?.monthly||0)}));m.address=m.address||'';m.nomineeName=m.nomineeName||'';m.nomineePhone=m.nomineePhone||'';return m;}
 state.members.forEach(normalizeMember);
 function searchPage(){return `<h2 class="page-title">Search</h2><div class="subtitle">Find members, chits and payments quickly</div><div class="search-box"><input id="globalSearch" placeholder="Search name, phone, member ID or chit..." oninput="runGlobalSearch()"><button class="btn gold" onclick="runGlobalSearch()">Search</button></div><div id="searchResults"><div class="empty">Type something to search.</div></div>`;}
-function runGlobalSearch(){const q=String(document.getElementById('globalSearch')?.value||'').trim().toLowerCase(),el=document.getElementById('searchResults');if(!el)return;if(!q){el.innerHTML='<div class="empty">Type something to search.</div>';return;}const out=[];state.members.filter(m=>[m.name,m.phone,m.memberNo].some(v=>String(v||'').toLowerCase().includes(q))).forEach(m=>out.push(`<div class="card search-result"><div class="avatar">${esc((m.name||'?')[0]).toUpperCase()}</div><div style="flex:1"><b>${esc(m.name)}</b><div class="muted">Member #${esc(m.memberNo||'—')} • ${esc(m.phone||'No phone')}</div></div><button class="action-btn" onclick="memberStatement('${String(m.id)}')">Statement</button></div>`));state.chits.filter(c=>String(c.name||'').toLowerCase().includes(q)).forEach(c=>out.push(`<div class="card search-result"><div class="avatar">▣</div><div style="flex:1"><b>${esc(c.name)}</b><div class="muted">${c.type==='dividend'?'Dividend':'Fixed'} • Monthly ${money(c.monthly||0)}</div></div><button class="action-btn edit" onclick="tab='chits';render()">Open</button></div>`));state.payments.filter(p=>[p.member,p.chit,p.month,p.date].some(v=>String(v||'').toLowerCase().includes(q))).slice(0,20).forEach(p=>out.push(`<div class="card search-result"><div class="avatar">₹</div><div style="flex:1"><b>${esc(p.member||'Member')}</b><div class="muted">${esc(p.chit||'')} • ${esc(p.month||'')} • ${esc(p.mode||'')}</div></div><b>${money(p.amount)}</b></div>`));el.innerHTML=out.length?`<div class="list">${out.join('')}</div>`:'<div class="empty">No matching records found.</div>';}
+function runGlobalSearch(){const q=String(document.getElementById('globalSearch')?.value||'').trim().toLowerCase(),el=document.getElementById('searchResults');if(!el)return;if(!q){el.innerHTML='<div class="empty">Type something to search.</div>';return;}const out=[];state.members.filter(m=>[m.name,m.phone,m.memberNo].some(v=>String(v||'').toLowerCase().includes(q))).forEach(m=>out.push(`<div class="card search-result"><div class="avatar">${esc((m.name||'?')[0]).toUpperCase()}</div><div style="flex:1"><b>${esc(m.name)}</b><div class="muted">Member #${esc(m.memberNo||'—')} • ${esc(m.phone||'No phone')}</div></div><button class="action-btn" onclick="memberStatement('${String(m.id)}')">Statement</button></div>`));state.chits.filter(c=>String(c.name||'').toLowerCase().includes(q)).forEach(c=>out.push(`<div class="card search-result"><div class="avatar">▣</div><div style="flex:1"><b>${esc(c.name)}</b><div class="muted">${c.type==='dividend'?'Dividend':'Fixed'} • Monthly ${money(c.monthly||0)}</div></div><button class="action-btn edit" onclick="setTab('chits')">Open</button></div>`));state.payments.filter(p=>[p.member,p.chit,p.month,p.date].some(v=>String(v||'').toLowerCase().includes(q))).slice(0,20).forEach(p=>out.push(`<div class="card search-result"><div class="avatar">₹</div><div style="flex:1"><b>${esc(p.member||'Member')}</b><div class="muted">${esc(p.chit||'')} • ${esc(p.month||'')} • ${esc(p.mode||'')}</div></div><b>${money(p.amount)}</b></div>`));el.innerHTML=out.length?`<div class="list">${out.join('')}</div>`:'<div class="empty">No matching records found.</div>';}
 function backupData(){const payload={app:'MithraQ',version:5,exportedAt:new Date().toISOString(),data:state};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='mithraq-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 function restoreData(){document.getElementById('restoreFile')?.click();}
 function handleRestore(input){const f=input.files?.[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const x=JSON.parse(r.result);const d=x.data||x;if(!d||!Array.isArray(d.chits)||!Array.isArray(d.members))throw new Error('Invalid backup');uiConfirm('Restore this backup? Current data will be replaced.',()=>{state={chits:d.chits||[],members:d.members||[],auctions:d.auctions||[],payments:d.payments||[]};save();uiAlert('Backup restored successfully.');tab='home';render();input.value='';},()=>{input.value='';});}catch(e){uiAlert('Invalid MithraQ backup file.');input.value='';}};r.readAsText(f);}
@@ -127,7 +127,23 @@ function confirmDeleteChit(id){
   const sid=String(id); state.chits=state.chits.filter(c=>String(c.id)!==sid); state.members=state.members.filter(m=>!(m.chitIds||[]).map(String).includes(sid)); state.auctions=state.auctions.filter(a=>String(a.chitId)!==sid); save(); closeModal(); render();
 }
 function newChit(){openModal('Create New Chit',`<div class="form"><input id="fName" placeholder="Chit name"><input id="fAmount" type="number" placeholder="Total amount ₹"><input id="fDuration" type="number" placeholder="Duration (months)"><input id="fCapacity" type="number" placeholder="Maximum members (optional)"><select id="fType"><option value="fixed">Fixed Chit</option><option value="dividend">Dividend Chit</option></select><input id="fCommission" type="number" placeholder="Commission % (optional)"><button class="btn gold full" onclick="createChit()">Create Chit</button></div>`);}
-function createChit(){const name=document.getElementById('fName').value.trim(),amount=Number(document.getElementById('fAmount').value),duration=Number(document.getElementById('fDuration').value),type=document.getElementById('fType').value,commission=Number(document.getElementById('fCommission').value||0);if(!name||!amount||!duration)return uiAlert('Please enter chit name, amount and duration.');state.chits.push({id:Date.now(),name,amount,duration,current:0,monthly:amount/duration,type,commission,capacity,status:'active'});save();closeModal();render();}
+function createChit(){
+  try{
+    const name=(document.getElementById('fName')?.value||'').trim();
+    const amount=Number(document.getElementById('fAmount')?.value||0);
+    const duration=Number(document.getElementById('fDuration')?.value||0);
+    const type=document.getElementById('fType')?.value||'fixed';
+    const commission=Number(document.getElementById('fCommission')?.value||0);
+    const capacity=Number(document.getElementById('fCapacity')?.value||duration);
+    if(!name||!amount||!duration) return uiAlert('Please enter chit name, amount and duration.');
+    state.chits.push({id:Date.now(),name,amount,duration,current:0,monthly:amount/duration,type,commission,capacity,status:'active'});
+    save(); closeModal(); render();
+    uiAlert('Chit created successfully.','Saved');
+  }catch(e){
+    console.error('Create chit error:',e);
+    uiAlert('Unable to save chit: '+(e.message||'Unknown error.'),'Save Error');
+  }
+}
 function filterMembers(){const q=(document.getElementById('memberSearch')?.value||'').trim().toLowerCase();document.querySelectorAll('.member-row').forEach(el=>{const hay=(el.dataset.search||'');el.style.display=!q||hay.includes(q)?'':'none';});document.querySelectorAll('.member-group-count').forEach(box=>{const group=box.closest('.accordion-body');if(!group)return;const visible=[...group.querySelectorAll('.member-row')].filter(x=>x.style.display!=='none').length;box.textContent=visible+' shown';});}
 function members(){if(!state.chits.length)return `<div class="row"><div><h2 class="page-title">Members</h2><div class="subtitle">Create a chit group first.</div></div></div><div class="empty big-empty"><div class="empty-icon">♙</div><b>No chit groups available</b><p>Add a chit first. Members will be added <strong>group-wise</strong> only to the chit you select.</p><button class="btn gold" onclick="newChit()">+ Create Chit</button></div>`;return `<div class="row"><div><h2 class="page-title">Members</h2><div class="subtitle">${state.members.length} registered members • Chit wise</div></div><button class="btn gold" onclick="newMember()">+ Add</button></div><div class="member-toolbar"><input id="memberSearch" placeholder="Search member name, phone or ID..." oninput="filterMembers()"><span class="member-total">${state.members.length} total</span></div><div class="accordion-list">${state.chits.map(c=>{const n=membersForChit(c.id).length,cap=Number(c.duration||0),full=cap>0&&n>=cap;return `<div class="accordion-item" id="acc-${c.id}"><div class="accordion-header" onclick="toggleChitAccordion('${String(c.id)}')"><div><div class="chit-title">${esc(c.name)}</div><div class="muted">${n}/${cap||'∞'} members${full?' • FULL':''} • Monthly ${money(c.monthly||0)}</div></div><span class="accordion-arrow">▾</span></div><div class="accordion-body"><div class="member-group-count muted">${n} shown</div><div class="list">${groupMemberPanel(c.id)}</div></div></div>`}).join('')}</div>`;}
 function toggleChitAccordion(id){const item=document.getElementById('acc-'+id);if(!item)return;const willOpen=!item.classList.contains('open');if(willOpen)document.querySelectorAll('.accordion-item.open').forEach(x=>{if(x!==item)x.classList.remove('open')});item.classList.toggle('open',willOpen);if(willOpen)item.scrollIntoView({behavior:'smooth',block:'start'});}
@@ -799,60 +815,63 @@ window.addEventListener('load',()=>{try{const s=JSON.parse(sessionStorage.getIte
 })();
 
 
-/* ===== Emergency Interaction Fix: Android/WebView ===== */
+
+/* ===== Runtime stability patch ===== */
 (function(){
-  const previousRender = render;
-  render = function(){
-    try {
-      return previousRender();
-    } catch (err) {
-      console.error('Render error:', err);
-      const app = document.getElementById('app');
-      if (app) app.innerHTML = '<div class="card"><h2 class="page-title">MithraQ</h2><div class="subtitle">The selected page could not be opened.</div><button class="btn gold full" type="button" onclick="goTab(\'home\')">Go to Home</button></div>';
+  // Inline handlers and dynamic menu actions use one stable navigation entry point.
+  window.setTab=function(nextTab){
+    try{
+      tab=nextTab;
+      render();
+    }catch(e){
+      console.error('Navigation error:',e);
+      const root=document.getElementById('app');
+      if(root) root.innerHTML='<div class="card"><h2 class="page-title">Unable to open this page</h2><p class="muted">Please try another section.</p></div>';
     }
   };
 
-  window.goTab = function(nextTab){
-    tab = nextTab || 'home';
-    closeMenuSheet();
-    render();
-    try { window.scrollTo({top:0, behavior:'smooth'}); } catch(e) { window.scrollTo(0,0); }
-  };
-  window.openAppMenu = function(){ openMenuSheet(); };
-
-  function handleNav(target){
-    const button = target && target.closest ? target.closest('[data-tab]') : null;
-    if (button && button.dataset && button.dataset.tab) {
-      window.goTab(button.dataset.tab);
-      return true;
+  // Never leave the main content completely blank when one page renderer fails.
+  const __mithraqRender=render;
+  render=function(){
+    const root=document.getElementById('app');
+    try{
+      return __mithraqRender();
+    }catch(e){
+      console.error('MithraQ render error:',e);
+      if(root){
+        root.innerHTML='<div class="card"><h2 class="page-title">MithraQ</h2><div class="subtitle">The selected page could not be loaded.</div><div class="hero"><small>APP STATUS</small><h2>Ready</h2><div class="hero-muted">Your saved data is safe. Use Home or another menu item to continue.</div></div><button class="btn gold full" type="button" onclick="setTab(\'home\')">Go to Home</button></div>';
+      }
+      return null;
     }
-    const menu = target && target.closest ? target.closest('#navMenuBtn') : null;
-    if (menu) { window.openAppMenu(); return true; }
-    return false;
-  }
+  };
 
-  // Works for normal browsers and Android WebView touch handling.
-  document.addEventListener('click', function(e){ handleNav(e.target); }, true);
-  document.addEventListener('touchend', function(e){
-    if (handleNav(e.target)) e.preventDefault();
-  }, {capture:true, passive:false});
-  document.addEventListener('pointerup', function(e){ handleNav(e.target); }, true);
-
-  // Explicitly expose frequently used inline handlers for restrictive WebViews.
-  [
-    'render','openMenuSheet','closeMenuSheet','newChit','createChit','editChit','updateChit','deleteChit',
-    'newMember','createMember','editMember','updateMember','deleteMember','collectMember','savePayment',
-    'editPayment','updatePayment','deletePayment','openHistory','loginAdmin','logoutAdmin','loginMember',
-    'showAdminLogin','showMemberLogin','openNotifications','addAnnouncement','publishAnnouncement',
-    'syncCloud','backupData','restoreData','saveSupabaseConfig','changeAdminPassword','saveSessionSecurity',
-    'openModal','closeModal','uiAlert','uiConfirm','goTab'
-  ].forEach(function(name){
-    try { if (typeof globalThis[name] === 'function') window[name] = globalThis[name]; } catch(e) {}
+  // Rebind bottom navigation after the full script is loaded.
+  document.querySelectorAll('.bottom-nav button[data-tab]').forEach(function(btn){
+    btn.onclick=function(ev){
+      ev.preventDefault();
+      window.setTab(btn.dataset.tab);
+    };
   });
 
-  // Make sure navigation buttons are always interactive above app layers.
-  const nav = document.querySelector('.bottom-nav');
-  if (nav) { nav.style.pointerEvents = 'auto'; nav.style.touchAction = 'manipulation'; }
+  // Helpful tap feedback for the menu button on Android WebView.
+  const menuBtn=document.getElementById('navMenuBtn');
+  if(menuBtn) menuBtn.onclick=function(ev){ev.preventDefault();openMenuSheet();};
 
-  window.addEventListener('error', function(e){ console.error('MithraQ error:', e.error || e.message); });
+  // Expose key actions explicitly for Android WebView inline handlers.
+  ['newChit','createChit','newMember','addMember','closeModal','openModal','openMenuSheet','closeMenuSheet','openHistory','loginAdmin','logoutAdmin'].forEach(function(name){
+    try{ if(typeof window[name]!=='function' && typeof eval(name)==='function') window[name]=eval(name); }catch(e){}
+  });
+
+  // Last-chance visible boot after load.
+  window.addEventListener('load',function(){
+    setTimeout(function(){
+      const root=document.getElementById('app');
+      const authRoot=document.getElementById('authRoot');
+      if(authUser && root && !root.innerHTML.trim()){
+        try{ render(); }catch(e){}
+      }else if(!authUser && authRoot && !authRoot.innerHTML.trim()){
+        try{ showLogin(); }catch(e){}
+      }
+    },50);
+  });
 })();
