@@ -386,3 +386,91 @@ body{background:linear-gradient(135deg,#f5fbf4,#e5f3e7)!important}
 .bottom-nav button.active{color:#08764d!important;background:#e9f7ec!important}
 .bottom-nav button.active:after{background:#c99a32!important}
 .btn.gold{background:linear-gradient(135deg,#e8c766,#bd8c29)!important}
+
+/* ===== GREEN UI TEXT VISIBILITY FIX ===== */
+body, .app{color:#16372B!important}
+.page-title{color:#073F2B!important}
+.subtitle,.muted{color:#5D7469!important}
+.section h3{color:#123D2F!important}
+.stat-label{color:#647B71!important;font-weight:800!important}
+.stat-value{color:#064B34!important;font-weight:800!important}
+.chit-title{color:#064B34!important;font-weight:800!important}
+.card,.quick,.table-card,.tx{color:#173B30!important}
+.card b,.quick b,.tx b,.metric b{color:#064B34!important}
+.empty{color:#60776C!important}
+.chip{color:#076B46!important}
+.bottom-nav button{color:#637970!important}
+.bottom-nav button.active{color:#08764D!important}
+.hero .muted{color:#E7F6EC!important}
+.hero h2,.hero small{color:#FFFFFF!important}
+.form label{color:#254B3E!important;font-weight:700!important}
+.form input,.form select,.search{color:#173B30!important}
+.form input::placeholder,.search::placeholder{color:#879A91!important}
+select option{background:#FFFFFF;color:#173B30}
+.btn{color:#FFFFFF!important}
+.btn.gold{color:#173126!important}
+.badge.active{color:#087447!important}
+.badge.pending{color:#A66B0B!important}
+
+/* ===== MATCHING POPUPS / MODALS ===== */
+.modal{
+ background:rgba(7,57,39,.30)!important;
+ backdrop-filter:blur(7px)!important;
+}
+.modal-card{
+ width:min(94vw,520px)!important;
+ border-radius:24px!important;
+ background:linear-gradient(180deg,#FFFFFF 0%,#F4FAF4 100%)!important;
+ border:1px solid #C8E1CF!important;
+ box-shadow:0 24px 70px rgba(7,84,59,.22)!important;
+ color:#173B30!important;
+ padding:20px!important;
+}
+.modal-head{
+ border-bottom:1px solid #DCEBE0!important;
+ padding-bottom:13px!important;
+}
+.modal-head h3{
+ color:#07543B!important;
+ font-size:21px!important;
+}
+.modal-head button{
+ background:#E9F5EB!important;
+ color:#07543B!important;
+ border:1px solid #CFE3D4!important;
+}
+.modal-card .form{gap:11px!important}
+.modal-card .form input,
+.modal-card .form select{
+ min-height:46px!important;
+ border-radius:13px!important;
+ background:#FFFFFF!important;
+ color:#173B30!important;
+ border:1px solid #CFE3D6!important;
+ box-shadow:0 2px 7px rgba(7,84,59,.04)!important;
+}
+.modal-card .form input:focus,
+.modal-card .form select:focus{
+ border-color:#0A8B58!important;
+ outline:none!important;
+ box-shadow:0 0 0 3px rgba(10,139,88,.10)!important;
+}
+.modal-card .btn.gold{
+ width:100%!important;
+ min-height:46px!important;
+ border-radius:13px!important;
+ margin-top:3px!important;
+}
+.modal-card .metric{
+ background:#F7FBF7!important;
+ border:1px solid #E0EEE3!important;
+ border-radius:12px!important;
+ padding:12px 13px!important;
+ margin:7px 0!important;
+}
+.modal-card .metric span{color:#647B71!important}
+.modal-card .metric b{color:#07543B!important}
+
+/* popup close button and cards stay readable */
+.modal-card h3,.modal-card p,.modal-card span,.modal-card div{color:inherit}
+.modal-card .muted{color:#6B8178!important}
