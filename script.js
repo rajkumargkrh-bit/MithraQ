@@ -240,11 +240,10 @@ function auctionFinance(c,bid,memberCount){
   const commissionAmt=chitAmount*commissionPct/100;
   const discount=Math.max(0,chitAmount-Number(bid||0));
   const prizeMoney=Math.max(0,chitAmount-discount);
-  const dividendPool=Math.max(0,discount-commissionAmt);
-  const totalMembers=Number(memberCount||0)||membersForChit(c?.id).length||Number(c?.duration||0)||1;
-  const shareCount=Math.max(1,totalMembers-1);
-  const dividendPerMember=dividendPool/shareCount;
   const monthly=Number(c?.monthly||(c?.duration?chitAmount/c.duration:0));
+  const shareCount=Math.max(1,Number(memberCount||0)||(monthly?Math.round(chitAmount/monthly):0)||membersForChit(c?.id).length||Number(c?.duration||0)||1);
+  const dividendPool=Math.max(0,(Number(bid||0)-monthly)-commissionAmt);
+  const dividendPerMember=dividendPool/shareCount;
   const payable=Math.max(0,monthly-dividendPerMember);
   return {chitAmount,commissionAmt,discount,prizeMoney,dividendPool,dividendPerMember,shareCount,monthly,payable};
 }
