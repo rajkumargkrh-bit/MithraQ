@@ -251,11 +251,9 @@ function auction(){
   if(!state.chits.length)return `<h2 class="page-title">Auction Room</h2><div class="subtitle">Group-wise live auction management</div><div class="empty big-empty"><b>No chit groups available</b><p>Create a chit before starting an auction.</p><button class="btn gold" onclick="newChit()">+ Create Chit</button></div>`;
   const c=chitById(auctionGroupValue)||state.chits[0]; auctionGroupValue=String(c.id);
   const ms=membersForChit(c.id), records=state.auctions.filter(a=>String(a.chitId)===String(c.id));
-  const rounds=[1,2,3];
   return `<div class="row"><div><h2 class="page-title">Auction Room</h2><div class="subtitle">Live bidding • Winner • Dividend • History</div></div><span class="badge active">${records.length} RECORDS</span></div>
   <div class="auction-tabs">${state.chits.map(x=>`<button class="auction-group ${String(x.id)===String(c.id)?'selected':''}" onclick="selectAuctionGroup('${String(x.id)}')">${esc(x.name)}<small>${membersForChit(x.id).length} members</small></button>`).join('')}</div>
   <div class="card auction-live-card"><div class="section no-margin"><div><h3>Live Auction</h3><span class="muted">${esc(c.name)} • ${esc(c.type==='dividend'?'Dividend':'Fixed')}</span></div><span class="live-dot">● LIVE</span></div>
-  <div class="auction-rounds">${rounds.map(r=>`<button class="round-pill ${auctionRoundValue===r?'selected':''}" onclick="selectAuctionRound(${r})">Round ${r}</button>`).join('')}</div>
   <div class="form"><label class="field-label">Bidder / Winner</label><select id="auctionMember">${ms.length?ms.map(m=>`<option value="${String(m.id)}">${esc(m.name)} • #${esc(m.memberNo||'—')}</option>`).join(''):'<option value="">No members in this group</option>'}</select><div class="form-note">Only members belonging to <b>${esc(c.name)}</b> can be selected.</div>
   <label class="field-label">Bid amount / discount ₹</label><input id="bid" type="number" min="1" max="${Number(c.amount||0)}" placeholder="Enter winning bid">
   <label class="field-label">Due Date</label><input id="dueDate" type="date" value="${defaultDueDate()}">
