@@ -1,13 +1,13 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap');
 
 :root{
-  --navy:#0B1630;
-  --navy2:#16264A;
-  --navy3:#20365F;
-  --gold:#C9A24D;
-  --gold2:#F0D58A;
-  --cream:#F5F1E8;
-  --surface:#FFFDF8;
+  --navy:#064D35;
+  --navy2:#08734B;
+  --navy3:#0D8055;
+  --gold:#C79B3B;
+  --gold2:#E8C968;
+  --cream:#F3F7F1;
+  --surface:#FFFFFF;
   --white:#FFFFFF;
   --text:#172033;
   --muted:#7D8799;
@@ -37,7 +37,7 @@ button{cursor:pointer}
   width:min(100%,560px);
   min-height:100vh;
   margin:auto;
-  background:linear-gradient(180deg,#faf7f0 0%,var(--cream) 100%);
+  background:linear-gradient(180deg,#fbfdf9 0%,var(--cream) 100%);
   position:relative;
   padding-bottom:92px;
   box-shadow:0 0 70px rgba(0,0,0,.12);
@@ -110,7 +110,7 @@ button{cursor:pointer}
   margin-bottom:17px;
 }
 .card{
-  background:rgba(255,253,248,.94);
+  background:rgba(255,255,255,.96);
   border:1px solid rgba(232,226,214,.9);
   border-radius:18px;
   padding:16px;
@@ -220,3 +220,22 @@ button{cursor:pointer}
 .search{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:13px;background:#fff;margin-bottom:11px;outline:none}
 .search:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(201,162,77,.12)}
 .chip{font-size:10px;font-weight:800;padding:6px 8px;border-radius:8px;background:#f1ece1;color:var(--navy)}
+
+.topbar{background:
+ radial-gradient(circle at 88% 15%,rgba(232,201,104,.24),transparent 24%),
+ linear-gradient(135deg,#03442f,#08754b 72%,#0a8759)}
+.topbar:before{content:"";position:absolute;right:70px;bottom:-20px;width:115px;height:50px;border-radius:50%;border:1px solid rgba(232,201,104,.28);transform:rotate(-18deg)}
+.hero{background:
+ radial-gradient(circle at 90% 5%,rgba(232,201,104,.25),transparent 24%),
+ radial-gradient(circle at 5% 100%,rgba(87,167,125,.25),transparent 36%),
+ linear-gradient(135deg,#03442f,#08754b)}
+.card{box-shadow:0 8px 24px rgba(6,77,53,.07)}
+.quick b{color:#08754b}
+.bottom-nav button.active{color:#064D35;background:#EDF7F0}
+.bottom-nav button.active:after{background:#C79B3B}
+.section h3{color:#064D35}
+.chit-title{color:#064D35}
+.stat-value{color:#064D35}
+.avatar{background:linear-gradient(145deg,#E8F5EC,#D4EBDC);border-color:#C9E2D2}
+.progress i{background:linear-gradient(90deg,#08754B,#57AE7D)}
+.leaf-accent{position:absolute;pointer-events:none;opacity:.14;font-size:76px;line-height:1}

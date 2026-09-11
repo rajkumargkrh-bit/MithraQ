@@ -23,14 +23,14 @@ function home(){
  const total=sum(state.chits,"amount"), collected=sum(state.payments,"amount");
  const pending=Math.max(0,total-collected);
  return `<h2 class="page-title">Good day 👋</h2><div class="subtitle">MithraQ • Smart Chit Management</div>
- <div class="hero"><small>✦ TOTAL CHIT PORTFOLIO</small><h2>${money(total)}</h2><div class="muted">Track collections, members, auctions and dividends from one place.</div></div>
+ <div class="hero"><span class="leaf-accent" style="right:12px;bottom:-6px">❧</span><small>♕ TOTAL CHIT PORTFOLIO</small><h2>${money(total)}</h2><div class="muted">Track collections, members, auctions and dividends from one place.</div></div>
  <div class="grid">
   <div class="card"><div class="stat-label">ACTIVE CHITS</div><div class="stat-value">${state.chits.length}</div></div>
   <div class="card"><div class="stat-label">MEMBERS</div><div class="stat-value">${state.members.length}</div></div>
   <div class="card"><div class="stat-label">COLLECTED</div><div class="stat-value">${money(collected)}</div></div>
   <div class="card"><div class="stat-label">PENDING</div><div class="stat-value">${money(pending)}</div></div>
  </div>
- <div class="section"><h3>Quick Actions</h3><span class="muted">Fast access</span></div>
+ <div class="section"><h3>Quick Actions</h3><span class="muted">Together We Grow</span></div>
  <div class="quick-grid">
   <button class="quick" onclick="newChit()"><b>＋</b>New Chit</button>
   <button class="quick" onclick="newMember()"><b>♙</b>Member</button>
