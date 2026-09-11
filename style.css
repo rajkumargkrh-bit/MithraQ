@@ -201,3 +201,22 @@ button{cursor:pointer}
   .app{margin:20px auto;min-height:calc(100vh - 40px);border-radius:28px}
   .bottom-nav{position:absolute;bottom:0}
 }
+
+.modal{position:fixed;inset:0;background:rgba(7,15,32,.58);backdrop-filter:blur(8px);z-index:30;display:grid;place-items:end center;padding:12px}
+.modal.hidden{display:none}
+.modal-card{width:min(100%,540px);background:#fffdf8;border-radius:25px;padding:18px;box-shadow:0 25px 80px rgba(0,0,0,.25);animation:up .22s ease}
+@keyframes up{from{transform:translateY(30px);opacity:.4}to{transform:none;opacity:1}}
+.modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}
+.modal-head h3{margin:0;font:700 21px "Playfair Display",serif;color:var(--navy)}
+.modal-head button{border:0;background:#eee9de;width:34px;height:34px;border-radius:10px;font-size:23px;color:var(--navy)}
+.quick-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.quick{border:1px solid var(--line);background:#fff;border-radius:15px;padding:14px 8px;text-align:center;font-weight:800;color:var(--navy);box-shadow:var(--shadow2)}
+.quick b{display:block;font-size:21px;margin-bottom:5px;color:var(--gold)}
+.metric{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #eee8dc}
+.metric:last-child{border-bottom:0}
+.table-card{overflow:hidden;padding:0}.table-card .table-title{padding:15px 16px;border-bottom:1px solid var(--line);font-weight:800}
+.tx{display:flex;justify-content:space-between;gap:10px;padding:13px 16px;border-bottom:1px solid #f0ece3}.tx:last-child{border-bottom:0}
+.tx .positive{color:var(--green);font-weight:800}.tx .negative{color:var(--red);font-weight:800}
+.search{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:13px;background:#fff;margin-bottom:11px;outline:none}
+.search:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(201,162,77,.12)}
+.chip{font-size:10px;font-weight:800;padding:6px 8px;border-radius:8px;background:#f1ece1;color:var(--navy)}
