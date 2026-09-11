@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MithraQ — Together We Grow</title>
-  <link rel="stylesheet" href="style.css?v=20260911-professional13">
+  <link rel="stylesheet" href="style.css?v=20260911-professional14">
 </head>
 <body>
   <div class="app">
@@ -15,13 +15,6 @@
         <h1>MithraQ</h1>
         <p>Chit • Members • Auction • Dividend • Reports</p>
       </div>
-      <div class="topbar-menu-wrap">
-        <button class="menu-btn" id="menuBtn" onclick="toggleMenu()" aria-label="Menu">☰</button>
-        <div class="menu-dropdown hidden" id="menuDropdown">
-          <button onclick="tab='reports';render();toggleMenu(true)">▤<span>Reports</span></button>
-          <button onclick="tab='settings';render();toggleMenu(true)">⚙<span>Settings</span></button>
-        </div>
-      </div>
     </header>
     <main id="app" class="content"></main>
     <div id="modal" class="modal hidden">
@@ -30,15 +23,26 @@
         <div id="modalBody"></div>
       </div>
     </div>
+    <div id="menuSheet" class="menu-sheet hidden" onclick="if(event.target===this)closeMenuSheet()">
+      <div class="menu-sheet-card">
+        <div class="menu-sheet-handle"></div>
+        <div class="menu-sheet-grid">
+          <button onclick="tab='members';render();closeMenuSheet()"><span class="menu-sheet-icon mi-blue">♙</span><span>Members</span></button>
+          <button onclick="tab='reports';render();closeMenuSheet()"><span class="menu-sheet-icon mi-green">▤</span><span>Reports</span></button>
+          <button onclick="tab='search';render();closeMenuSheet()"><span class="menu-sheet-icon mi-gold">⌕</span><span>Search</span></button>
+          <button onclick="tab='settings';render();closeMenuSheet()"><span class="menu-sheet-icon mi-grey">⚙</span><span>Settings</span></button>
+        </div>
+      </div>
+    </div>
     <nav class="bottom-nav">
-      <button data-tab="home" class="active">⌂<span>Home</span></button>
-      <button data-tab="chits">▣<span>Chits</span></button>
-      <button data-tab="members">♙<span>Members</span></button>
-      <button data-tab="auction">♢<span>Auction</span></button>
-      <button data-tab="collection">₹<span>Collection</span></button>
+      <button data-tab="home" class="nav-item active"><span class="nav-icon">⌂</span><span class="nav-label">Home</span></button>
+      <button data-tab="chits" class="nav-item"><span class="nav-icon">▣</span><span class="nav-label">Chits</span></button>
+      <button class="nav-item nav-menu" id="navMenuBtn" onclick="openMenuSheet()"><span class="nav-menu-circle">☰</span><span class="nav-label menu-label">Menu</span></button>
+      <button data-tab="auction" class="nav-item"><span class="nav-icon">♢</span><span class="nav-label">Auction</span></button>
+      <button data-tab="collection" class="nav-item"><span class="nav-icon">₹</span><span class="nav-label">Collection</span></button>
     </nav>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="script.js?v=20260911-professional13"></script>
+  <script src="script.js?v=20260911-professional14"></script>
 </body>
 </html>
