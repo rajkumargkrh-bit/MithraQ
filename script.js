@@ -254,6 +254,19 @@ let auctionLiveChitId='';
 let auctionBidHistory=[];
 let auctionStopped=false;
 
+function auctionFinance(c,bid,memberCount){
+  const chitAmount=Number(c?.amount||0);
+  const commissionPct=Number(c?.commission||0);
+  const commissionAmt=chitAmount*commissionPct/100;
+  const discount=Math.max(0,chitAmount-Number(bid||0));
+  const prizeMoney=Math.max(0,chitAmount-discount);
+  const monthly=Number(c?.monthly||(c?.duration?chitAmount/c.duration:0));
+  const shareCount=Math.max(1,Number(memberCount||0)||(monthly?Math.round(chitAmount/monthly):0)||membersForChit(c?.id).length||Number(c?.duration||0)||1);
+  const dividendPool=Math.max(0,(Number(bid||0)-monthly)-commissionAmt);
+  const dividendPerMember=dividendPool/shareCount;
+  const payable=Math.max(0,monthly-dividendPerMember);
+  return {chitAmount,commissionAmt,discount,prizeMoney,dividendPool,dividendPerMember,shareCount,monthly,payable};
+}
 function auction(){
   if(!state.chits.length)return `<h2 class="page-title">Auction Room</h2><div class="subtitle">Group-wise live auction management</div><div class="empty big-empty"><b>No chit groups available</b><p>Create a chit before starting an auction.</p><button class="btn gold" onclick="newChit()">+ Create Chit</button></div>`;
   if(!auctionLiveChitId){
@@ -338,8 +351,30 @@ function saveAuction(){
   if(!m||!membersForChit(c.id).some(x=>String(x.id)===String(mid)))return uiAlert('Selected member does not belong to this chit group.');
   const dueDate=document.getElementById('dueDate')?.value||defaultDueDate();
   const fin=auctionFinance(c,bid);
-  const rec={id:Date.now(),chit:c.name,chitId:c.id,member:m.name,memberId:m.id,bid,round:'Round '+auctionRoundValue,chitAmount:fin.chitAmount,dividend:fin.discount,auctionDiscount:fin.discount,commissionPct:Number(c.commission||0),commissionAmt:fin.commissionAmt,dividendPool:fin.dividendPool,shareCount:fin.shareCount,monthly:fin.monthly,dividendPerMember:fin.dividendPerMember,payable:fin.payable,dueDate,date:new Date().toLocaleDateString('en-IN'),createdAt:new Date().toISOString(),bidHistory:auctionBidHistory.map(b=>({memberId:b.memberId,memberName:b.memberName,bid:b.bid,time:b.time,timeLabel:b.timeLabel}))};
-  state.auctions.unshift(rec);save();clearInterval(auctionTimer);auctionRunning=false;auctionStopped=false;auctionBidHistory=[];auctionLiveChitId='';auctionSeconds=0;uiAlert('Auction winner saved successfully.');render();
+  const rec={id:Date.now(),chit:c.name,chitId:c.id,member:m.name,memberId:m.id,bid,round:'Round '+auctionRoundValue,chitAmount:fin.chitAmount,dividend:fin.dividendPerMember,auctionDiscount:fin.discount,commissionPct:Number(c.commission||0),commissionAmt:fin.commissionAmt,dividendPool:fin.dividendPool,shareCount:fin.shareCount,monthly:fin.monthly,dividendPerMember:fin.dividendPerMember,payable:fin.payable,winnerPrize:fin.prizeMoney,dueDate,date:new Date().toLocaleDateString('en-IN'),createdAt:new Date().toISOString(),bidHistory:auctionBidHistory.map(b=>({memberId:b.memberId,memberName:b.memberName,bid:b.bid,time:b.time,timeLabel:b.timeLabel}))};
+  state.auctions.unshift(rec);save();clearInterval(auctionTimer);auctionRunning=false;auctionStopped=false;auctionBidHistory=[];auctionLiveChitId='';auctionSeconds=0;render();openAuctionSavedReceipt(rec.id);
+}
+function openAuctionSavedReceipt(id){
+  const a=state.auctions.find(x=>String(x.id)===String(id));if(!a)return;
+  const c=chitById(a.chitId);
+  const fin={chitAmount:Number(a.chitAmount||c?.amount||0),prizeMoney:Number(a.winnerPrize!=null?a.winnerPrize:(Number(a.chitAmount||c?.amount||0)-Number(a.bid||0))),dividendPerMember:Number(a.dividendPerMember||a.dividend||0),payable:Number(a.payable||0)};
+  openModal('Auction Result • Download',`<div class="auction-download-card">
+    <div class="auction-download-head"><div><span class="badge active">✓ SAVED</span><h3>Auction Winner Details</h3><div class="muted">${esc(a.chit)} • ${esc(a.round||'Round 1')}</div></div><div class="winner-mini">🏆<b>${esc(a.member)}</b></div></div>
+    <div class="auction-download-grid">
+      <div><span>Chit value</span><b>${money(fin.chitAmount)}</b></div>
+      <div><span>Bid/discount</span><b>${money(a.bid)}</b></div>
+      <div><span>Winner prize</span><b>${money(fin.prizeMoney)}</b></div>
+      <div><span>Dividend shown</span><b>${money(fin.dividendPerMember)}</b></div>
+      <div class="payable-cell"><span>Payable shown</span><b>${money(fin.payable)}</b></div>
+    </div>
+    <div class="auction-download-actions"><button class="btn gold full" onclick="downloadAuctionResult('${String(a.id)}')">⬇️ Download</button><button class="btn full" onclick="printAuctionReceipt('${String(a.id)}')">🖨️ Print</button><button class="btn full" onclick="whatsappAuctionResult('${String(a.id)}')">💬 WhatsApp</button></div>
+  </div>`);
+}
+function downloadAuctionResult(id){
+  const a=state.auctions.find(x=>String(x.id)===String(id));if(!a)return;const c=chitById(a.chitId);
+  const chitAmount=Number(a.chitAmount||c?.amount||0),bid=Number(a.bid||0),prize=Number(a.winnerPrize!=null?a.winnerPrize:Math.max(0,chitAmount-bid)),divi=Number(a.dividendPerMember||a.dividend||0),payable=Number(a.payable||0);
+  const html=`<!doctype html><html><head><meta charset="utf-8"><title>MithraQ Auction Result</title><style>body{font-family:Arial,sans-serif;background:#f5faf7;color:#21483d;padding:28px}.receipt{max-width:520px;margin:auto;background:white;border:1px solid #d9e7e0;border-radius:22px;padding:24px;box-shadow:0 10px 30px rgba(0,70,50,.08)}h1{margin:0;color:#056b4f}.sub{color:#71857e;margin:5px 0 20px}.r{display:flex;justify-content:space-between;padding:13px 0;border-bottom:1px solid #edf2ef}.r b{color:#056b4f}.winner{padding:14px;background:#eef8f2;border-radius:14px;margin-bottom:12px}.pay{background:#fff5cf;border:1px solid #ead69a;border-radius:14px;padding:16px;display:flex;justify-content:space-between;font-size:20px;font-weight:800;margin-top:12px}</style></head><body><div class="receipt"><h1>MithraQ</h1><div class="sub">Auction Winner Result</div><div class="winner"><b>Winner: ${esc(a.member)}</b><br><span>${esc(a.chit)} • ${esc(a.round||'Round 1')}</span></div><div class="r"><span>Chit value:</span><b>${money(chitAmount)}</b></div><div class="r"><span>Bid/discount:</span><b>${money(bid)}</b></div><div class="r"><span>Winner prize:</span><b>${money(prize)}</b></div><div class="r"><span>Dividend shown:</span><b>${money(divi)}</b></div><div class="pay"><span>Payable shown:</span><span>${money(payable)}</span></div></div></body></html>`;
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='mithraq-auction-result-'+String(a.chit||'chit').replace(/[^a-z0-9]+/gi,'-').toLowerCase()+'.html';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 function editAuction(id){const a=state.auctions.find(x=>String(x.id)===String(id));if(!a)return;const c=chitById(a.chitId),list=c?membersForChit(c.id):[];openModal('Edit Auction Result',`<div class="form"><label class="field-label">Chit Group</label><select id="eaChit" onchange="renderEditAuctionMembers()">${state.chits.map(x=>`<option value="${String(x.id)}" ${String(x.id)===String(a.chitId)?'selected':''}>${esc(x.name)}</option>`).join('')}</select><label class="field-label">Winner / Bidder</label><div id="eaMembers"><select id="eaMember">${list.map(m=>`<option value="${String(m.id)}" ${String(m.id)===String(a.memberId)?'selected':''}>${esc(m.name)} • #${esc(m.memberNo||'—')}</option>`).join('')}</select></div><label class="field-label">Round</label><select id="eaRound">${[1,2,3].map(r=>`<option value="${r}" ${String(a.round||'Round 1')==='Round '+r?'selected':''}>Round ${r}</option>`).join('')}</select><label class="field-label">Winning bid ₹</label><input id="eaBid" type="number" min="1" value="${Number(a.bid||0)}"><label class="field-label">Due Date</label><input id="eaDue" type="date" value="${esc(a.dueDate||defaultDueDate())}"><button class="btn gold full" onclick="updateAuction('${String(id)}')">Save Changes</button></div>`);}
 function renderEditAuctionMembers(){const c=chitById(document.getElementById('eaChit')?.value),el=document.getElementById('eaMembers');if(!c||!el)return;el.innerHTML=`<select id="eaMember">${membersForChit(c.id).map(m=>`<option value="${String(m.id)}">${esc(m.name)} • #${esc(m.memberNo||'—')}</option>`).join('')||'<option value="">No members</option>'}</select>`;}
