@@ -73,7 +73,7 @@ function restoreData(){document.getElementById('restoreFile')?.click();}
 function handleRestore(input){const f=input.files?.[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const x=JSON.parse(r.result);const d=x.data||x;if(!d||!Array.isArray(d.chits)||!Array.isArray(d.members))throw new Error('Invalid backup');uiConfirm('Restore this backup? Current data will be replaced.',()=>{state={chits:d.chits||[],members:d.members||[],auctions:d.auctions||[],payments:d.payments||[]};save();uiAlert('Backup restored successfully.');tab='home';render();input.value='';},()=>{input.value='';});}catch(e){uiAlert('Invalid MithraQ backup file.');input.value='';}};r.readAsText(f);}
 function settingsPanel(){const a=getAuth();return `<div class="card"><h3 style="margin-top:0">Security & Data</h3><div class="muted">Admin: ${esc(a?.name||"Admin")} • Username: ${esc(a?.username||"—")}</div><div class="backup-grid"><button class="btn" onclick="logoutAdmin()">🔒 Logout</button><button class="btn gold" onclick="backupData()">⬇️ Backup Data</button><button class="btn" onclick="restoreData()">⬆️ Restore Data</button></div><input id="restoreFile" class="file-input" type="file" accept="application/json,.json" onchange="handleRestore(this)"><div class="backup-note">Backup includes chits, members, auctions and payments. Browser login remains available offline.</div></div>`+supabasePanel()}
 const MENU_TABS=['members','reports','search','settings'];
-function render(){const app=document.getElementById("app"); if(tab==='home')app.innerHTML=home(); if(tab==='chits')app.innerHTML=chits(); if(tab==='members')app.innerHTML=members(); if(tab==='auction')app.innerHTML=auction(); if(tab==='reports')app.innerHTML=reports(); if(tab==='collection')app.innerHTML=collection(); if(tab==='search')app.innerHTML=searchPage(); if(tab==='settings')app.innerHTML='<h2 class="page-title">Settings</h2><div class="subtitle">Security, backup and device controls</div>'+settingsPanel(); document.querySelectorAll('.bottom-nav button[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab)); const navMenuBtn=document.getElementById('navMenuBtn'); if(navMenuBtn)navMenuBtn.classList.toggle('active',MENU_TABS.includes(tab));}
+function render(){const app=document.getElementById("app"); if(tab==='home')app.innerHTML=home(); if(tab==='chits')app.innerHTML=chits(); if(tab==='members')app.innerHTML=members(); if(tab==='auction')app.innerHTML=auction(); if(tab==='reports')app.innerHTML=reports(); if(tab==='collection')app.innerHTML=collection(); if(tab==='search')app.innerHTML=searchPage(); if(tab==='history')app.innerHTML=historyPage(); if(tab==='settings')app.innerHTML='<h2 class="page-title">Settings</h2><div class="subtitle">Security, backup and device controls</div>'+settingsPanel(); document.querySelectorAll('.bottom-nav button[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab)); const navMenuBtn=document.getElementById('navMenuBtn'); if(navMenuBtn)navMenuBtn.classList.toggle('active',MENU_TABS.includes(tab));}
 function openMenuSheet(){const s=document.getElementById('menuSheet'); if(s)s.classList.remove('hidden');}
 function closeMenuSheet(){const s=document.getElementById('menuSheet'); if(s)s.classList.add('hidden');}
 function chits(){return `<div class="row"><div><h2 class="page-title">Chits</h2><div class="subtitle">Create groups first, then add members to a selected group.</div></div><button class="btn gold" onclick="newChit()">+ New Chit</button></div><div class="list">${state.chits.length?state.chits.map(c=>{const n=membersForChit(c.id).length;return `<div class="card chit-card"><div class="chit-card-head"><div><div class="chit-title">${esc(c.name)}</div><div class="muted">${money(c.amount)} · ${c.duration||0} months · ${c.type==='dividend'?'Dividend':'Fixed'}</div></div><div class="chit-card-tools"><button class="icon-action edit" type="button" title="Edit Chit" aria-label="Edit Chit" onclick="editChit('${String(c.id)}')">✎</button><button class="icon-action delete" type="button" title="Delete Chit" aria-label="Delete Chit" onclick="deleteChit('${String(c.id)}')">⌫</button></div></div><div class="chit-card-meta"><span class="badge active">${n} MEMBERS</span></div><div class="progress"><i style="width:${Math.min(100,(c.current||0)/(c.duration||1)*100)}%"></i></div><div class="muted">Monthly ${money(c.monthly||0)} · ${c.current||0}/${c.duration||0} months</div><button class="small-link" onclick="openGroupMembers('${c.id}')">View ${n} group members →</button></div>`}).join(''):'<div class="empty">No chits yet.<br><br><button class="btn gold" onclick="newChit()">Create your first chit</button></div>'}</div>`;}
@@ -367,6 +367,79 @@ function groupMemberPanel(id){
   return list.length?list.map(m=>{const p=paymentFor(m.id,month),e=memberMonthly(m,c),st=paymentStatus(p,e),label=st==='paid'?'PAID':st==='partial'?'PARTIAL':'PENDING';return `<div class="card member"><div class="avatar">${esc((m.name||'?')[0]).toUpperCase()}</div><div style="flex:1"><div class="chit-title">${esc(m.name)}</div><div class="muted">${esc(m.phone||'No phone')} • Member #${esc(m.memberNo||'—')}</div><div class="muted">Joined ${esc(m.joiningDate||'—')} • Monthly ${money(e)}</div><div class="member-actions"><button class="action-btn collect" onclick="collectMember('${String(m.id)}','${String(c.id)}')">${p?'✓ Payment':'₹ Collect'}</button><button class="action-btn edit" onclick="editMember('${String(m.id)}')">✎ Edit</button><button class="action-btn" onclick="member360('${String(m.id)}')">👤 Profile</button><button class="action-btn" onclick="memberStatement('${String(m.id)}')">📋 Statement</button><button class="action-btn" onclick="whatsappMember('${String(m.id)}')">💬 WhatsApp</button><button class="action-btn delete" onclick="deleteMember('${String(m.id)}')">⌫ Delete</button></div></div><span class="badge ${st==='paid'?'active':st==='partial'?'partial':'pending'}">${label}</span></div>`}).join(''):'<div class="empty big-empty"><div class="empty-icon">♙</div><b>No members in this group</b><p>Add members to start collection and auction management.</p><button class="btn gold" onclick="newMember()">+ Add Member</button></div>';
 }
 
+/* ===== Chit-wise Collection History — read-only, expandable ===== */
+function historyMonthLabel(month){
+  if(!/^\d{4}-\d{2}$/.test(String(month||''))) return String(month||'—');
+  const [y,m]=String(month).split('-').map(Number);
+  return new Date(y,m-1,1).toLocaleDateString('en-IN',{month:'long',year:'numeric'});
+}
+function historyMonthsForChit(c){
+  const members=membersForChit(c.id);
+  const months=new Set();
+  state.payments.filter(p=>String(p.chitId)===String(c.id)).forEach(p=>{if(/^\d{4}-\d{2}$/.test(String(p.month||'')))months.add(String(p.month));});
+  // Always show the current month so a newly created group has a useful history panel.
+  months.add(new Date().toISOString().slice(0,7));
+  // Include a continuous range only when records already exist, bounded by the chit duration.
+  const sorted=[...months].sort();
+  if(sorted.length>1){
+    const start=new Date(sorted[0]+'-01T00:00:00');
+    const end=new Date(sorted[sorted.length-1]+'-01T00:00:00');
+    const range=[]; let cur=new Date(start);
+    const maxMonths=Math.max(1,Number(c.duration||0)||120);
+    let guard=0;
+    while(cur<=end && guard<maxMonths && guard<240){
+      range.push(cur.toISOString().slice(0,7));
+      cur.setMonth(cur.getMonth()+1); guard++;
+    }
+    return range.reverse();
+  }
+  return sorted.reverse();
+}
+function historyMemberRow(m,c,month){
+  const p=paymentFor(m.id,month), expected=memberMonthly(m,c), status=paymentStatus(p,expected);
+  const paid=Number(p?.amount||0), balance=Math.max(0,expected-paid);
+  return `<div class="history-member-row">
+    <div class="history-avatar">${esc((m.name||'?')[0]).toUpperCase()}</div>
+    <div class="history-member-main"><b>${esc(m.name)}</b><div class="muted">Member #${esc(m.memberNo||'—')} • Expected ${money(expected)}</div>${p?`<div class="muted">Paid date ${esc(p.date||'—')} • ${esc(p.mode||'—')}</div>`:'<div class="muted">No payment recorded for this month</div>'}</div>
+    <div class="history-member-amount"><strong>${money(paid)}</strong><span class="badge ${status==='paid'?'active':status==='partial'?'partial':'pending'}">${status.toUpperCase()}</span>${status!=='paid'&&expected?`<small>Bal. ${money(balance)}</small>`:''}</div>
+  </div>`;
+}
+function historyChitDetails(c){
+  const members=membersForChit(c.id), months=historyMonthsForChit(c);
+  return `<div class="history-detail">
+    <div class="history-summary"><span>${members.length} Members</span><span>${months.length} Months</span><span>Monthly ${money(c.monthly||0)}</span></div>
+    <div class="history-month-list">${months.map((month,i)=>{
+      const rows=members.map(m=>historyMemberRow(m,c,month)).join('');
+      const total=members.reduce((sum,m)=>sum+Number(paymentFor(m.id,month)?.amount||0),0);
+      const paidCount=members.filter(m=>paymentStatus(paymentFor(m.id,month),memberMonthly(m,c))==='paid').length;
+      return `<div class="history-month ${i===0?'open':''}" id="hist-month-${c.id}-${month}">
+        <button class="history-month-head" onclick="toggleHistoryMonth('${String(c.id)}','${month}')"><div><b>${esc(historyMonthLabel(month))}</b><span>${paidCount}/${members.length} paid • Total ${money(total)}</span></div><span class="history-chevron">⌄</span></button>
+        <div class="history-month-body">${rows||'<div class="empty">No members in this chit.</div>'}</div>
+      </div>`;
+    }).join('')}</div>
+  </div>`;
+}
+function historyPage(){
+  return `<div class="row"><div><h2 class="page-title">History</h2><div class="subtitle">Chit-wise monthly collection history • tap a chit to show / hide details</div></div></div>
+  <div class="history-note"><b>Payment History</b><span>Each chit shows who paid, how much, the month, date, mode and pending balance.</span></div>
+  <div class="history-chit-list">${state.chits.length?state.chits.map(c=>{
+    const members=membersForChit(c.id), payments=state.payments.filter(p=>String(p.chitId)===String(c.id));
+    const total=payments.reduce((s,p)=>s+Number(p.amount||0),0);
+    return `<div class="history-chit" id="history-chit-${c.id}">
+      <button class="history-chit-head" onclick="toggleHistoryChit('${String(c.id)}')"><div class="history-chit-icon">▣</div><div class="history-chit-main"><b>${esc(c.name)}</b><span>${money(c.amount)} • ${c.duration||0} months • ${members.length} members</span><small>Total collected: ${money(total)}</small></div><span class="history-chevron">⌄</span></button>
+      <div class="history-chit-body">${historyChitDetails(c)}</div>
+    </div>`;
+  }).join(''):'<div class="empty big-empty"><div class="empty-icon">◷</div><b>No chit history yet</b><p>Create a chit and record collections. The monthly history will appear here automatically.</p></div>'}</div>`;
+}
+function toggleHistoryChit(id){
+  const item=document.getElementById('history-chit-'+id); if(!item)return;
+  item.classList.toggle('open');
+}
+function toggleHistoryMonth(chitId,month){
+  const item=document.getElementById('hist-month-'+chitId+'-'+month); if(!item)return;
+  item.classList.toggle('open');
+}
+
 /* ===== MithraQ Add-on Pack: Business Insights & Safety (non-destructive) ===== */
 function addonNum(v){return Number(v||0)||0;}
 function addonAllExpected(){return state.members.reduce((s,m)=>{const c=(m.chitIds||[]).map(chitById).find(Boolean);return s+addonNum(m.monthly||c?.monthly)},0);}
@@ -397,6 +470,7 @@ setTimeout(()=>{if(document.querySelector('.app')&&!document.querySelector('.app
     user:'<circle cx="12" cy="8" r="3.2"/><path d="M5.5 20c.6-4 2.7-6 6.5-6s5.9 2 6.5 6"/>',
     report:'<rect x="5" y="4" width="14" height="16" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
     search:'<circle cx="10.8" cy="10.8" r="6"/><path d="m16 16 4.5 4.5"/>',
+    history:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/><path d="M4.5 5.5 3 7"/>',
     settings:'<path d="M12 8.2a3.8 3.8 0 1 0 0 7.6 3.8 3.8 0 0 0 0-7.6Z"/><path d="m19.4 15 .2.1a1.7 1.7 0 0 1-1.7 3l-.2-.1a1.7 1.7 0 0 0-2.5 1.5v.2a1.7 1.7 0 0 1-3.4 0v-.2a1.7 1.7 0 0 0-2.5-1.5l-.2.1a1.7 1.7 0 1 1-1.7-3l.2-.1a1.7 1.7 0 0 0 0-3l-.2-.1a1.7 1.7 0 1 1 1.7-3l.2.1A1.7 1.7 0 0 0 11.8 7v-.2a1.7 1.7 0 0 1 3.4 0V7a1.7 1.7 0 0 0 2.5 1.5l.2-.1a1.7 1.7 0 1 1 1.7 3l-.2.1a1.7 1.7 0 0 0 0 3Z"/>',
     edit:'<path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3Z"/><path d="m14.5 7.5 3 3"/>',
     trash:'<path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5"/>',
@@ -418,7 +492,7 @@ setTimeout(()=>{if(document.querySelector('.app')&&!document.querySelector('.app
     close:'<path d="m6 6 12 12M18 6 6 18"/>'
   };
   const map={
-    '⌂':'home','▣':'grid','♢':'auction','₹':'rupee','☰':'menu','♙':'user','▤':'report','⌕':'search','⚙':'settings',
+    '⌂':'home','▣':'grid','♢':'auction','₹':'rupee','☰':'menu','♙':'user','▤':'report','⌕':'search','⚙':'settings','◷':'history',
     '✎':'edit','⌫':'trash','+':'plus','→':'arrow','⬇️':'down','⬆️':'up','⬇':'down','⬆':'up','🔒':'lock','💬':'message','🖨️':'printer','🖨':'printer','🧾':'receipt','📋':'clipboard','✓':'check','📊':'chart','☁️':'cloud','☁':'cloud','⚠️':'warning','⚠':'warning','×':'close','!':'info','♛':'star'
   };
   function svg(name){return '<svg class="mq-svg" viewBox="0 0 24 24" aria-hidden="true">'+(ICONS[name]||ICONS.info)+'</svg>';}
