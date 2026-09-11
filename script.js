@@ -16,7 +16,32 @@ function chits(){return `<div class="row"><div><h2 class="page-title">Chits</h2>
 function newChit(){openModal('Create New Chit',`<div class="form"><input id="fName" placeholder="Chit name"><input id="fAmount" type="number" placeholder="Total amount ₹"><input id="fDuration" type="number" placeholder="Duration (months)"><select id="fType"><option value="fixed">Fixed Chit</option><option value="dividend">Dividend Chit</option></select><input id="fCommission" type="number" placeholder="Commission % (optional)"><button class="btn gold full" onclick="createChit()">Create Chit</button></div>`);}
 function createChit(){const name=document.getElementById('fName').value.trim(),amount=Number(document.getElementById('fAmount').value),duration=Number(document.getElementById('fDuration').value),type=document.getElementById('fType').value,commission=Number(document.getElementById('fCommission').value||0);if(!name||!amount||!duration)return alert('Please enter chit name, amount and duration.');state.chits.push({id:Date.now(),name,amount,duration,current:0,monthly:amount/duration,type,commission});save();closeModal();render();}
 function members(){if(!state.chits.length)return `<div class="row"><div><h2 class="page-title">Members</h2><div class="subtitle">Create a chit group first.</div></div></div><div class="empty big-empty"><div class="empty-icon">♙</div><b>No chit groups available</b><p>Add a chit first. Members will be added <strong>group-wise</strong> only to the chit you select.</p><button class="btn gold" onclick="newChit()">+ Create Chit</button></div>`;return `<div class="row"><div><h2 class="page-title">Members</h2><div class="subtitle">${state.members.length} registered members • Group wise</div></div><button class="btn gold" onclick="newMember()">+ Add</button></div><div class="group-tabs">${state.chits.map((c,i)=>`<button class="group-pill ${i===0?'selected':''}" onclick="showGroup('${c.id}',this)">${esc(c.name)} <b>${membersForChit(c.id).length}</b></button>`).join('')}</div><div id="groupMembers">${groupMemberPanel(state.chits[0].id)}</div>`;}
-function groupMemberPanel(id){const c=chitById(id),list=membersForChit(id);return `<div class="group-head"><div><h3>${esc(c.name)}</h3><span>${c.type==='dividend'?'Dividend':'Fixed'} • Monthly ${money(c.monthly||0)}</span></div><span class="badge active">${list.length} MEMBERS</span></div><div class="list">${list.length?list.map(m=>`<div class="card member"><div class="avatar">${esc((m.name||'?')[0]).toUpperCase()}</div><div style="flex:1"><div class="chit-title">${esc(m.name)}</div><div class="muted">${esc(m.phone||'No phone')} • Member #${esc(m.memberNo||'—')}</div><div class="muted">Joined ${esc(m.joiningDate||'—')} • Monthly ${money(m.monthly||c.monthly||0)}</div></div><span class="badge active">ACTIVE</span></div>`).join(''):'<div class="empty">No members in this chit yet.<br><br><button class="btn gold" onclick="newMember('${c.id}')">+ Add member to ${esc(c.name)}</button></div>'}</div>`;}
+function groupMemberPanel(id){
+  const c=chitById(id);
+  if(!c) return '<div class="empty">Chit group not found.</div>';
+  const list=membersForChit(id);
+  const memberHtml=list.length ? list.map(m=>{
+    const avatar=esc((m.name||'?')[0]).toUpperCase();
+    return '<div class="card member">'+
+      '<div class="avatar">'+avatar+'</div>'+
+      '<div style="flex:1">'+
+        '<div class="chit-title">'+esc(m.name)+'</div>'+
+        '<div class="muted">'+esc(m.phone||'No phone')+' • Member #'+esc(m.memberNo||'—')+'</div>'+
+        '<div class="muted">Joined '+esc(m.joiningDate||'—')+' • Monthly '+money(m.monthly||c.monthly||0)+'</div>'+
+      '</div>'+
+      '<span class="badge active">ACTIVE</span>'+
+    '</div>';
+  }).join('') :
+    '<div class="empty">No members in this chit yet.<br><br>'+
+      '<button class="btn gold" onclick="newMember(\''+String(c.id).replace(/'/g,"\\'")+'\')">+ Add member to '+esc(c.name)+'</button>'+
+    '</div>';
+
+  return '<div class="group-head">'+
+    '<div><h3>'+esc(c.name)+'</h3>'+
+    '<span>'+(c.type==='dividend'?'Dividend':'Fixed')+' • Monthly '+money(c.monthly||0)+'</span></div>'+
+    '<span class="badge active">'+list.length+' MEMBERS</span>'+
+  '</div><div class="list">'+memberHtml+'</div>';
+}
 function showGroup(id,el){document.querySelectorAll('.group-pill').forEach(x=>x.classList.remove('selected'));el.classList.add('selected');document.getElementById('groupMembers').innerHTML=groupMemberPanel(id);}
 function openGroupMembers(id){tab='members';render();setTimeout(()=>{const btn=[...document.querySelectorAll('.group-pill')].find(x=>x.textContent.trim().startsWith(chitById(id)?.name||'§'));if(btn)showGroup(id,btn);},0);}
 function newMember(preselect=''){if(!state.chits.length)return alert('Please create a chit group first.');openModal('Add Member — Select Chit Group',`<div class="form"><label class="field-label">Chit Group <span>*</span></label><select id="mChit">${state.chits.map(c=>`<option value="${c.id}" ${String(c.id)===String(preselect)?'selected':''}>${esc(c.name)} • ${c.type==='dividend'?'Dividend':'Fixed'} • ${money(c.monthly||0)}/month</option>`).join('')}</select><label class="field-label">Member details</label><input id="mName" placeholder="Member name"><input id="mPhone" type="tel" placeholder="Phone number"><input id="mNo" placeholder="Member number (optional)"><input id="mDate" type="date" value="${new Date().toISOString().slice(0,10)}"><input id="mMonthly" type="number" placeholder="Monthly amount ₹ (optional)"><button class="btn gold full" onclick="createMember()">Add to Selected Chit</button><div class="form-note">Only members added to the selected chit will appear in that group, and only those members can be used for that group's auction.</div></div>`);}
