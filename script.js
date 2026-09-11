@@ -268,7 +268,7 @@ function auctionFinance(c,bid,memberCount){
 function auction(){
   if(!state.chits.length)return `<h2 class="page-title">Live</h2><div class="subtitle">Live chit auction</div><div class="empty big-empty"><b>No chit groups available</b><p>Create a chit before starting an auction.</p><button class="btn gold" onclick="newChit()">+ Create Chit</button></div>`;
 
-  /* LIVE opens first to the chit list. Nothing else is shown until a chit is tapped. */
+  /* LIVE opens only the chit list. No auction controls are shown until a chit is tapped. */
   if(!auctionGroupValue){
     return `<div class="row"><div><h2 class="page-title">Live</h2><div class="subtitle">Tap a chit to open the live auction</div></div><span class="badge active">LIVE</span></div>
     <div class="list">${state.chits.map(x=>`<button type="button" class="card live-chit-select" onclick="selectAuctionGroup('${String(x.id)}')">
@@ -288,17 +288,14 @@ function auction(){
   return `<div class="row"><div><h2 class="page-title">Live</h2><div class="subtitle">${esc(c.name)} • Live bidding</div></div><button class="action-btn" onclick="auctionGroupValue='';auctionRunning=false;clearInterval(auctionTimer);render()">← Chits</button></div>
   <div class="card auction-live-card">
     <div class="section no-margin"><div><h3>${esc(c.name)}</h3><span class="muted">${ms.length} members • ${money(c.amount)} chit value</span></div><span class="live-dot">● LIVE</span></div>
-    ${!auctionRunning&&!hasLastBid?`<div class="live-start-panel"><div class="live-big">LIVE AUCTION</div><div class="muted">Press START to begin bidding.</div><button class="btn gold full" id="auctionTimerBtn" onclick="startAuctionTimer()">START</button></div>`:''}
+    ${!auctionRunning&&!hasLastBid?`<div class="live-start-panel"><div class="live-big">LIVE</div><div class="muted">Press START to begin bidding.</div><button class="btn gold full" id="auctionTimerBtn" onclick="startAuctionTimer()">START</button></div>`:''}
     ${auctionRunning||hasLastBid?`<div class="form">
       <label class="field-label">Bidder / Last Bidder</label>
       <select id="auctionMember">${ms.length?ms.map(m=>`<option value="${String(m.id)}">${esc(m.name)} • #${esc(m.memberNo||'—')}</option>`).join(''):'<option value="">No members in this group</option>'}</select>
-      <div class="form-note">Select the member who called the latest bid.</div>
       <label class="field-label">Bid amount ₹</label>
-      <input id="bid" type="number" min="1" max="${Number(c.amount||0)}" placeholder="Enter latest bid" oninput="previewAuctionDividend('${String(c.id)}')">
-      <div id="auctionDividendPreview" class="card" style="margin:8px 0 0;background:#f8faf9;border:1px solid #dfe9e4"><div class="muted">Enter the latest bid to calculate dividend automatically.</div></div>
-      <div class="timer-card"><div><span>AUCTION TIME</span><strong id="timer">00:${String(auctionSeconds).padStart(2,'0')}</strong></div><button class="timer-btn" id="auctionTimerBtn" onclick="startAuctionTimer()">${auctionRunning?'STOP':'START'}</button></div>
+      <input id="bid" type="number" min="1" max="${Number(c.amount||0)}" placeholder="Enter bid amount">
+      <div class="timer-card"><div><span>AUCTION TIME</span><strong id="timer">${String(Math.floor(auctionSeconds/60)).padStart(2,'0')}:${String(auctionSeconds%60).padStart(2,'0')}</strong></div><button class="timer-btn" id="auctionTimerBtn" onclick="startAuctionTimer()">${auctionRunning?'STOP':'START'}</button></div>
       ${winnerText}
-      ${!auctionRunning?`<button class="btn gold full" onclick="saveAuction()">🏆 Confirm Winner & Save Auction</button>`:''}
     </div>`:''}
   </div>
   <div class="section"><h3>Round History</h3><span class="muted">${records.length} auction record(s)</span></div>
@@ -350,6 +347,14 @@ function startAuctionTimer(){
       if(Number(bidInput.value)>Number(chitById(auctionGroupValue)?.amount||0)){
         auctionRunning=true;
         return uiAlert('Bid cannot be greater than the chit value.');
+      }
+      const c=chitById(auctionGroupValue);
+      const m=state.members.find(x=>String(x.id)===String(opt.value));
+      if(c&&m){
+        const bid=Number(bidInput.value);
+        const fin=auctionFinance(c,bid);
+        const rec={id:Date.now(),chit:c.name,chitId:c.id,member:m.name,memberId:m.id,bid,round:'Round '+auctionRoundValue,chitAmount:fin.chitAmount,dividend:fin.discount,auctionDiscount:fin.discount,commissionPct:Number(c.commission||0),commissionAmt:fin.commissionAmt,dividendPool:fin.dividendPool,shareCount:fin.shareCount,monthly:fin.monthly,dividendPerMember:fin.dividendPerMember,payable:fin.payable,dueDate:defaultDueDate(),date:new Date().toLocaleDateString('en-IN'),createdAt:new Date().toISOString()};
+        state.auctions.unshift(rec); save();
       }
       render();
       uiAlert('Bidding stopped. '+opt.textContent+' is the winner with the last bid of ₹'+bidInput.value+'.');
