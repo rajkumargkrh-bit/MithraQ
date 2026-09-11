@@ -604,3 +604,18 @@ body{
   .quick b{font-size:17px!important}
   .bottom-nav button span{font-size:10px!important}
 }
+
+/* ===== FIXED + DIVIDEND CHIT UI ===== */
+.form select{
+ appearance:auto!important;
+}
+#auctionPreview{
+ display:grid!important;
+ grid-template-columns:1fr auto;
+ gap:4px 12px;
+ background:#F1F9F2!important;
+ border:1px solid #CFE5D4!important;
+ border-radius:14px!important;
+}
+#auctionPreview span{color:#5E776B!important;font-weight:700!important}
+#auctionPreview b{color:#08764D!important}
