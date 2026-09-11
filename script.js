@@ -266,19 +266,41 @@ function auctionFinance(c,bid,memberCount){
   return {chitAmount,commissionAmt,discount,prizeMoney,dividendPool,dividendPerMember,shareCount,monthly,payable};
 }
 function auction(){
-  if(!state.chits.length)return `<h2 class="page-title">Auction Room</h2><div class="subtitle">Group-wise live auction management</div><div class="empty big-empty"><b>No chit groups available</b><p>Create a chit before starting an auction.</p><button class="btn gold" onclick="newChit()">+ Create Chit</button></div>`;
-  const c=chitById(auctionGroupValue)||state.chits[0]; auctionGroupValue=String(c.id);
+  if(!state.chits.length)return `<h2 class="page-title">Live</h2><div class="subtitle">Live chit auction</div><div class="empty big-empty"><b>No chit groups available</b><p>Create a chit before starting an auction.</p><button class="btn gold" onclick="newChit()">+ Create Chit</button></div>`;
+
+  /* LIVE opens first to the chit list. Nothing else is shown until a chit is tapped. */
+  if(!auctionGroupValue){
+    return `<div class="row"><div><h2 class="page-title">Live</h2><div class="subtitle">Tap a chit to open the live auction</div></div><span class="badge active">LIVE</span></div>
+    <div class="list">${state.chits.map(x=>`<button type="button" class="card live-chit-select" onclick="selectAuctionGroup('${String(x.id)}')">
+      <div class="row"><div><b class="chit-title">${esc(x.name)}</b><div class="muted">${money(x.amount)} • Monthly ${money(x.monthly)} • ${membersForChit(x.id).length} members</div></div><span class="badge active">OPEN →</span></div>
+    </button>`).join('')}</div>`;
+  }
+
+  const c=chitById(auctionGroupValue);
+  if(!c){auctionGroupValue='';return auction();}
+
   const ms=membersForChit(c.id), records=state.auctions.filter(a=>String(a.chitId)===String(c.id));
-  return `<div class="row"><div><h2 class="page-title">Auction Room</h2><div class="subtitle">Live bidding • Winner • Dividend • History</div></div><span class="badge active">${records.length} RECORDS</span></div>
-  <div class="auction-tabs">${state.chits.map(x=>`<button class="auction-group ${String(x.id)===String(c.id)?'selected':''}" onclick="selectAuctionGroup('${String(x.id)}')">${esc(x.name)}<small>${membersForChit(x.id).length} members</small></button>`).join('')}</div>
-  <div class="card auction-live-card"><div class="section no-margin"><div><h3>Live Auction</h3><span class="muted">${esc(c.name)} • ${esc(c.type==='dividend'?'Dividend':'Fixed')}</span></div><span class="live-dot">● LIVE</span></div>
-  <div class="form"><label class="field-label">Bidder / Winner</label><select id="auctionMember">${ms.length?ms.map(m=>`<option value="${String(m.id)}">${esc(m.name)} • #${esc(m.memberNo||'—')}</option>`).join(''):'<option value="">No members in this group</option>'}</select><div class="form-note">Only members belonging to <b>${esc(c.name)}</b> can be selected.</div>
-  <label class="field-label">Bid amount / discount ₹</label><input id="bid" type="number" min="1" max="${Number(c.amount||0)}" placeholder="Enter winning bid" oninput="previewAuctionDividend('${String(c.id)}')">
-  <div id="auctionDividendPreview" class="card" style="margin:8px 0 0;background:#f8faf9;border:1px solid #dfe9e4"><div class="muted">Enter the bid to calculate dividend automatically.</div></div>
-  <label class="field-label">Due Date</label><input id="dueDate" type="date" value="${defaultDueDate()}">
-  <div class="timer-card"><div id="timer">00:${String(auctionSeconds).padStart(2,'0')}</div><button class="timer-btn" id="auctionTimerBtn" onclick="startAuctionTimer()">${auctionRunning?'STOP':'START'}</button></div>
-  <button class="btn gold full" onclick="saveAuction()">🏆 Confirm Winner & Save Auction</button></div></div>
-  <div class="card auction-summary"><div><span>Chit Value</span><b>${money(c.amount)}</b></div><div><span>Monthly</span><b>${money(c.monthly)}</b></div><div><span>Members</span><b>${ms.length}</b></div></div>
+  const hasLastBid=!!(document.getElementById('auctionMember')?.value && document.getElementById('bid')?.value);
+  const lastMember=document.getElementById('auctionMember')?.selectedOptions?.[0]?.textContent||'';
+  const lastBid=document.getElementById('bid')?.value||'';
+  const winnerText=(!auctionRunning&&hasLastBid)?`<div class="auction-winner-live"><div class="winner-badge">🏆</div><div><span>WINNER — LAST BID</span><b>${esc(lastMember)}</b><strong>${money(lastBid)}</strong></div></div>`:'';
+
+  return `<div class="row"><div><h2 class="page-title">Live</h2><div class="subtitle">${esc(c.name)} • Live bidding</div></div><button class="action-btn" onclick="auctionGroupValue='';auctionRunning=false;clearInterval(auctionTimer);render()">← Chits</button></div>
+  <div class="card auction-live-card">
+    <div class="section no-margin"><div><h3>${esc(c.name)}</h3><span class="muted">${ms.length} members • ${money(c.amount)} chit value</span></div><span class="live-dot">● LIVE</span></div>
+    ${!auctionRunning&&!hasLastBid?`<div class="live-start-panel"><div class="live-big">LIVE AUCTION</div><div class="muted">Press START to begin bidding.</div><button class="btn gold full" id="auctionTimerBtn" onclick="startAuctionTimer()">START</button></div>`:''}
+    ${auctionRunning||hasLastBid?`<div class="form">
+      <label class="field-label">Bidder / Last Bidder</label>
+      <select id="auctionMember">${ms.length?ms.map(m=>`<option value="${String(m.id)}">${esc(m.name)} • #${esc(m.memberNo||'—')}</option>`).join(''):'<option value="">No members in this group</option>'}</select>
+      <div class="form-note">Select the member who called the latest bid.</div>
+      <label class="field-label">Bid amount ₹</label>
+      <input id="bid" type="number" min="1" max="${Number(c.amount||0)}" placeholder="Enter latest bid" oninput="previewAuctionDividend('${String(c.id)}')">
+      <div id="auctionDividendPreview" class="card" style="margin:8px 0 0;background:#f8faf9;border:1px solid #dfe9e4"><div class="muted">Enter the latest bid to calculate dividend automatically.</div></div>
+      <div class="timer-card"><div><span>AUCTION TIME</span><strong id="timer">00:${String(auctionSeconds).padStart(2,'0')}</strong></div><button class="timer-btn" id="auctionTimerBtn" onclick="startAuctionTimer()">${auctionRunning?'STOP':'START'}</button></div>
+      ${winnerText}
+      ${!auctionRunning?`<button class="btn gold full" onclick="saveAuction()">🏆 Confirm Winner & Save Auction</button>`:''}
+    </div>`:''}
+  </div>
   <div class="section"><h3>Round History</h3><span class="muted">${records.length} auction record(s)</span></div>
   <div class="list">${records.length?records.map(a=>auctionRecordHtml(a,c)).join(''):'<div class="empty">No auction records for this group yet.</div>'}</div>`;
 }
@@ -305,26 +327,35 @@ function selectAuctionGroup(id){auctionGroupValue=String(id);auctionRoundValue=1
 function selectAuctionRound(r){auctionRoundValue=Number(r)||1;const el=document.getElementById('roundNo');if(el)el.textContent=auctionRoundValue;document.querySelectorAll('.round-pill').forEach((b,i)=>b.classList.toggle('selected',i+1===auctionRoundValue));}
 function startAuctionTimer(){
   const t=document.getElementById('timer'),btn=document.getElementById('auctionTimerBtn');
-  if(!t)return;
+  if(!btn)return;
   if(!auctionRunning){
-    /* START: bidding goes live. Keep updating Bidder/Winner + Bid amount as members call out bids. */
     auctionRunning=true;
     auctionSeconds=0;
-    t.textContent='00:00';
-    if(btn)btn.textContent='STOP';
+    if(t)t.textContent='00:00';
+    btn.textContent='STOP';
     clearInterval(auctionTimer);
-    auctionTimer=setInterval(()=>{auctionSeconds++;const mm=Math.floor(auctionSeconds/60),ss=auctionSeconds%60;t.textContent=String(mm).padStart(2,'0')+':'+String(ss).padStart(2,'0');},1000);
+    auctionTimer=setInterval(()=>{
+      auctionSeconds++;
+      const mm=Math.floor(auctionSeconds/60),ss=auctionSeconds%60;
+      const el=document.getElementById('timer');
+      if(el)el.textContent=String(mm).padStart(2,'0')+':'+String(ss).padStart(2,'0');
+    },1000);
+    render();
   }else{
-    /* STOP: bidding closes. Whoever is currently selected as Bidder/Winner with the entered bid is the last bid, i.e. the winner. */
     auctionRunning=false;
     clearInterval(auctionTimer);
-    if(btn)btn.textContent='START';
     const memberSel=document.getElementById('auctionMember'),bidInput=document.getElementById('bid');
     const opt=memberSel&&memberSel.selectedIndex>-1?memberSel.options[memberSel.selectedIndex]:null;
-    if(opt&&opt.value&&bidInput&&bidInput.value){
-      uiAlert('Bidding stopped.\n'+opt.textContent+' placed the last bid of ₹'+bidInput.value+' and is the winner.\nClick "Confirm Winner & Save Auction" to save.');
+    if(opt&&opt.value&&bidInput&&Number(bidInput.value)>0){
+      if(Number(bidInput.value)>Number(chitById(auctionGroupValue)?.amount||0)){
+        auctionRunning=true;
+        return uiAlert('Bid cannot be greater than the chit value.');
+      }
+      render();
+      uiAlert('Bidding stopped. '+opt.textContent+' is the winner with the last bid of ₹'+bidInput.value+'.');
     }else{
-      uiAlert('Bidding stopped. Select the last bidder and enter their bid, then confirm the winner.');
+      render();
+      uiAlert('Bidding stopped. Select the last bidder and enter the last bid amount.');
     }
   }
 }
