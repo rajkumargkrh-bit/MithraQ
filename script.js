@@ -23,14 +23,14 @@ function render(){
 }
 function home(total,collected,pending){
  return `<h2 class="page-title">Dashboard</h2><div class="subtitle">Welcome to MithraQ</div>
- <div class="hero"><small>Total Chit Value</small><h2>${money(total)}</h2><div class="muted" style="color:#c9d0df">Manage your chits, members and auctions in one place.</div></div>
+ <div class="hero"><small>✦ TOTAL CHIT VALUE</small><h2>${money(total)}</h2><div class="muted" style="color:#c9d0df">Manage your chits, members and auctions in one place.</div></div>
  <div class="grid">
   <div class="card"><div class="stat-label">ACTIVE CHITS</div><div class="stat-value">${state.chits.length}</div></div>
   <div class="card"><div class="stat-label">MEMBERS</div><div class="stat-value">${state.members.length}</div></div>
   <div class="card"><div class="stat-label">COLLECTED</div><div class="stat-value">${money(collected)}</div></div>
   <div class="card"><div class="stat-label">PENDING</div><div class="stat-value">${money(pending)}</div></div>
  </div>
- <div class="section"><h3>Quick Actions</h3></div>
+ <div class="section"><h3>Quick Actions</h3><span class="muted">Fast access</span></div>
  <div class="grid"><button class="btn gold" onclick="tab='chits';render()">+ New Chit</button><button class="btn" onclick="tab='members';render()">+ Member</button></div>`;
 }
 function chits(){
