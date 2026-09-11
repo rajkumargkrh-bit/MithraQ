@@ -1,4 +1,4 @@
-const CACHE='mithraq-pwa-v2-blankfix';
+const CACHE='mithraq-disabled-v3';
 const ASSETS=['./','./index.html','./style.css','./script.js','./manifest.webmanifest','./assets/mithra-icon-192.png','./assets/mithra-icon-512.png','./assets/mithra-logo.png'];
 
 self.addEventListener('install',event=>event.waitUntil(

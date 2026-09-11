@@ -49,6 +49,23 @@
       <button data-tab="collection" class="nav-item"><span class="nav-icon">₹</span><span class="nav-label">Collection</span></button>
     </nav>
   </div>
+
+  <script>
+  // Emergency boot guard: never leave the main area blank.
+  (function(){
+    var app=document.getElementById('app');
+    function fallback(){
+      if(!app || app.children.length) return;
+      app.innerHTML='<div style="padding:26px 22px"><h2 style="margin:0 0 6px;color:#056b4f;font-family:serif">Welcome to MithraQ</h2><p style="color:#74837f;margin:0 0 18px">Smart Chit Management</p><div style="background:#056b4f;color:white;border-radius:22px;padding:22px;margin-bottom:14px"><small style="font-weight:700;letter-spacing:1px">DASHBOARD READY</small><h2 style="margin:10px 0 0">₹0</h2><p style="margin:8px 0 0;opacity:.85">Your app is loading safely.</p></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div style="background:white;border-radius:16px;padding:18px;border:1px solid #dbe8e1"><small>ACTIVE CHITS</small><h2 style="margin:8px 0 0;color:#056b4f">0</h2></div><div style="background:white;border-radius:16px;padding:18px;border:1px solid #dbe8e1"><small>MEMBERS</small><h2 style="margin:8px 0 0;color:#056b4f">0</h2></div></div></div>';
+    }
+    fallback();
+    setTimeout(fallback,1200);
+    setTimeout(fallback,3000);
+    // Remove stale service workers/caches from earlier broken PWA builds.
+    if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(function(rs){rs.forEach(function(r){r.unregister();});}).catch(function(){});}
+    if(window.caches){caches.keys().then(function(keys){keys.filter(function(k){return k.indexOf('mithraq')===0;}).forEach(function(k){caches.delete(k);});}).catch(function(){});}
+  })();
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="script.js?v=20260911-phase16-blankfix"></script>
 </body>

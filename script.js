@@ -774,11 +774,7 @@ window.addEventListener('load',()=>{try{const s=JSON.parse(sessionStorage.getIte
   window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;hideInstall();localStorage.removeItem('mithraq_install_dismissed');});
   window.addEventListener('load',()=>{
     updateNetwork();
-    if('serviceWorker' in navigator){
-      navigator.serviceWorker.register('./sw.js?v=blankfix-v2').then(reg=>{
-        if(reg.waiting) reg.waiting.postMessage({type:'SKIP_WAITING'});
-      }).catch(()=>{});
-    }
+    // Service worker disabled temporarily to prevent stale-cache blank screens.
     const btn=document.getElementById('installBtn'),close=document.getElementById('installClose');
     if(btn)btn.addEventListener('click',async()=>{if(!deferredInstallPrompt){showInstall();return;}deferredInstallPrompt.prompt();await deferredInstallPrompt.userChoice;deferredInstallPrompt=null;hideInstall();});
     if(close)close.addEventListener('click',()=>{localStorage.setItem('mithraq_install_dismissed','1');hideInstall();});
@@ -810,3 +806,12 @@ window.addEventListener('load',()=>{try{const s=JSON.parse(sessionStorage.getIte
     }
   });
 })();
+
+
+/* Emergency final boot: guarantee visible content even if a feature render fails. */
+window.addEventListener('load',()=>{
+  const app=document.getElementById('app');
+  if(!app) return;
+  try{ if(authUser){ tab='home'; render(); } }catch(e){ console.error(e); }
+  if(!app.children.length){ app.innerHTML='<div class="content"><h2 class="page-title">Welcome to MithraQ</h2><div class="subtitle">Dashboard recovery mode</div></div>'; }
+});
