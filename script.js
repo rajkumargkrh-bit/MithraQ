@@ -12,14 +12,8 @@ const KEY="mithraq_v2_groupwise";
 const SUPA_CFG_KEY="mithraq_supabase_config_v1";
 let supa=null, supaStatus="Not connected", syncBusy=false;
 function getSupabaseConfig(){try{return JSON.parse(localStorage.getItem(SUPA_CFG_KEY)||"null")}catch(e){return null}}
-function initSupabase(){
-  const c=getSupabaseConfig();
-  if(!c?.url||!c?.anonKey){supa=null;supaStatus="Not configured";return false}
-  if(!/^https:\/\/[^ ]+\.supabase\.co$/.test(c.url)){supa=null;supaStatus="Invalid project URL";return false}
-  supa={url:c.url,anonKey:c.anonKey};supaStatus="Connected";return true
-}
+function initSupabase(){const c=getSupabaseConfig();if(!c?.url||!c?.anonKey||!window.supabase){supa=null;supaStatus=window.supabase?"Not configured":"Library loading";return false}try{supa=window.supabase.createClient(c.url,c.anonKey);supaStatus="Connected";return true}catch(e){supa=null;supaStatus="Invalid configuration";return false}}
 initSupabase();
-
 let state=(()=>{try{return JSON.parse(localStorage.getItem(KEY)||'null')||{chits:[],members:[],auctions:[],payments:[]}}catch(e){return {chits:[],members:[],auctions:[],payments:[]}}})();
 // Migrate old MithraQ data if it exists.
 if(!state.chits.length && !state.members.length){try{const old=JSON.parse(localStorage.getItem('mithraq_v1')||'null');if(old)state=old;}catch(e){}}
@@ -28,37 +22,8 @@ state.auctions=Array.isArray(state.auctions)?state.auctions:[]; state.payments=A
 let tab="home";
 let collectionMonthValue=new Date().toISOString().slice(0,7);
 function save(){localStorage.setItem(KEY,JSON.stringify(state));}
-async function supabaseFetch(path,options={}){
-  if(!supa) return null;
-  const headers=Object.assign({"apikey":supa.anonKey,"Authorization":"Bearer "+supa.anonKey,"Content-Type":"application/json","Accept":"application/json"},options.headers||{});
-  const r=await fetch(supa.url+"/rest/v1/"+path,Object.assign({},options,{headers}));
-  const text=await r.text();
-  let data=null; try{data=text?JSON.parse(text):null}catch(e){data=text}
-  if(!r.ok){const msg=(data&&data.message)||data||("HTTP "+r.status);throw new Error(String(msg))}
-  return data;
-}
-async function pushToSupabase(){
-  if(!supa||syncBusy)return false;syncBusy=true;
-  try{
-    const payload={id:"main",data:state,updated_at:new Date().toISOString()};
-    await supabaseFetch("mithraq_data?on_conflict=id",{method:"POST",headers:{"Prefer":"resolution=merge-duplicates,return=minimal"},body:JSON.stringify(payload)});
-    supaStatus="Synced";return true;
-  }catch(e){supaStatus="Sync error: "+(e.message||"unknown");return false}
-  finally{syncBusy=false}
-}
-async function pullFromSupabase(){
-  if(!supa||syncBusy)return false;syncBusy=true;
-  try{
-    const rows=await supabaseFetch("mithraq_data?select=data,updated_at&id=eq.main&limit=1",{method:"GET"});
-    const row=Array.isArray(rows)?rows[0]:rows;
-    if(row?.data){
-      state={chits:row.data.chits||[],members:row.data.members||[],auctions:row.data.auctions||[],payments:row.data.payments||[]};
-      _localSave();supaStatus="Downloaded";render();return true;
-    }
-    supaStatus="Connected (no cloud data yet)";return false;
-  }catch(e){supaStatus="Sync error: "+(e.message||"unknown");return false}
-  finally{syncBusy=false}
-}
+async function pushToSupabase(){if(!supa||syncBusy)return false;syncBusy=true;try{const payload={id:"main",data:state,updated_at:new Date().toISOString()};const {error}=await supa.from("mithraq_data").upsert(payload,{onConflict:"id"});if(error)throw error;supaStatus="Synced";return true}catch(e){supaStatus="Sync error: "+(e.message||"unknown");return false}finally{syncBusy=false}}
+async function pullFromSupabase(){if(!supa||syncBusy)return false;syncBusy=true;try{const {data,error}=await supa.from("mithraq_data").select("data,updated_at").eq("id","main").maybeSingle();if(error)throw error;if(data?.data){state={chits:data.data.chits||[],members:data.data.members||[],auctions:data.data.auctions||[],payments:data.data.payments||[]};save();supaStatus="Downloaded";render();return true}supaStatus="Connected (no cloud data yet)";return false}catch(e){supaStatus="Sync error: "+(e.message||"unknown");return false}finally{syncBusy=false}}
 async function syncCloud(mode="push"){if(!initSupabase()){alert("Supabase is not configured. Open Settings → Supabase Live Sync and enter your Project URL + anon key.");return}const ok=mode==='pull'?await pullFromSupabase():await pushToSupabase();alert(ok?(mode==='pull'?'Cloud data downloaded successfully.':'Data uploaded to Supabase successfully.'):'Supabase sync failed. Check the configuration and RLS policy.');render()}
 function supabasePanel(){const c=getSupabaseConfig()||{};return `<div class="card"><h3 style="margin-top:0">☁️ Supabase Live Sync</h3><div class="muted">Status: <b>${esc(supaStatus)}</b></div><div class="form"><input id="supaUrl" value="${esc(c.url||'')}" placeholder="Supabase Project URL"><input id="supaAnon" value="${esc(c.anonKey||'')}" placeholder="Supabase anon/public key" type="password"><button class="btn gold full" onclick="saveSupabaseConfig()">Save & Connect</button></div><div class="backup-grid"><button class="btn" onclick="syncCloud('pull')">⬇️ Download Cloud</button><button class="btn" onclick="syncCloud('push')">⬆️ Upload to Cloud</button></div><div class="backup-note">Use only the Supabase <b>anon/public</b> key in this browser. Never paste the service-role/secret key here. Run the included <b>supabase_phase10.sql</b> once in Supabase SQL Editor before syncing.</div></div>`}
 function saveSupabaseConfig(){const url=(document.getElementById('supaUrl')?.value||'').trim().replace(/\/$/,''),anonKey=(document.getElementById('supaAnon')?.value||'').trim();if(!/^https:\/\/[^ ]+\.supabase\.co$/.test(url)||anonKey.length<20)return alert('Enter a valid Supabase Project URL and anon/public key.');localStorage.setItem(SUPA_CFG_KEY,JSON.stringify({url,anonKey}));initSupabase();alert('Supabase connection saved.');render()}
@@ -73,7 +38,6 @@ function restoreData(){document.getElementById('restoreFile')?.click();}
 function handleRestore(input){const f=input.files?.[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const x=JSON.parse(r.result);const d=x.data||x;if(!d||!Array.isArray(d.chits)||!Array.isArray(d.members))throw new Error('Invalid backup');if(!confirm('Restore this backup? Current data will be replaced.')){input.value='';return;}state={chits:d.chits||[],members:d.members||[],auctions:d.auctions||[],payments:d.payments||[]};save();alert('Backup restored successfully.');tab='home';render();}catch(e){alert('Invalid MithraQ backup file.');}input.value='';};r.readAsText(f);}
 function settingsPanel(){const a=getAuth();return `<div class="card"><h3 style="margin-top:0">Security & Data</h3><div class="muted">Admin: ${esc(a?.name||"Admin")} • Username: ${esc(a?.username||"—")}</div><div class="backup-grid"><button class="btn" onclick="logoutAdmin()">🔒 Logout</button><button class="btn gold" onclick="backupData()">⬇️ Backup Data</button><button class="btn" onclick="restoreData()">⬆️ Restore Data</button></div><input id="restoreFile" class="file-input" type="file" accept="application/json,.json" onchange="handleRestore(this)"><div class="backup-note">Backup includes chits, members, auctions and payments. Browser login remains available offline.</div></div>`+supabasePanel()}
 function render(){const app=document.getElementById("app"); if(tab==='home')app.innerHTML=home(); if(tab==='chits')app.innerHTML=chits(); if(tab==='members')app.innerHTML=members(); if(tab==='auction')app.innerHTML=auction(); if(tab==='reports')app.innerHTML=reports(); if(tab==='collection')app.innerHTML=collection(); if(tab==='search')app.innerHTML=searchPage(); if(tab==='settings')app.innerHTML='<h2 class="page-title">Settings</h2><div class="subtitle">Security, backup and device controls</div>'+settingsPanel(); document.querySelectorAll('.bottom-nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));}
-function home(){const total=state.chits.reduce((s,c)=>s+Number(c.amount||0),0),col=state.payments.reduce((s,p)=>s+Number(p.amount||0),0);return `<h2 class="page-title">Good day 👋</h2><div class="subtitle">MithraQ • Smart Chit Management</div><div class="hero"><small>♛ TOTAL CHIT PORTFOLIO</small><h2>${money(total)}</h2><div class="muted hero-muted">Track collections, members, auctions and dividends from one place.</div></div><div class="grid"><div class="card"><div class="stat-label">ACTIVE CHITS</div><div class="stat-value">${state.chits.length}</div></div><div class="card"><div class="stat-label">MEMBERS</div><div class="stat-value">${state.members.length}</div></div><div class="card"><div class="stat-label">COLLECTED</div><div class="stat-value">${money(col)}</div></div><div class="card"><div class="stat-label">PENDING</div><div class="stat-value">${money(Math.max(0,total-col))}</div></div></div><div class="section"><h3>Quick Actions</h3><span class="muted">Together We Grow</span></div><div class="quick-grid"><button class="quick" onclick="newChit()"><b>＋</b><span>New Chit</span></button><button class="quick" onclick="newMember()"><b>♙</b><span>Member</span></button><button class="quick" onclick="tab='collection';render()"><b>₹</b><span>Collection</span></button><button class="quick" onclick="tab='search';render()"><b>⌕</b><span>Search</span></button><button class="quick" onclick="tab='settings';render()"><b>⚙</b><span>Settings</span></button></div><div class="section"><h3>Recent Activity</h3></div><div class="empty recent">No transactions yet.</div>`;}
 function chits(){return `<div class="row"><div><h2 class="page-title">Chits</h2><div class="subtitle">Create groups first, then add members to a selected group.</div></div><button class="btn gold" onclick="newChit()">+ New Chit</button></div><div class="list">${state.chits.length?state.chits.map(c=>{const n=membersForChit(c.id).length;return `<div class="card chit-card"><div class="chit-card-head"><div><div class="chit-title">${esc(c.name)}</div><div class="muted">${money(c.amount)} · ${c.duration||0} months · ${c.type==='dividend'?'Dividend':'Fixed'}</div></div><div class="chit-card-tools"><button class="icon-action edit" type="button" title="Edit Chit" aria-label="Edit Chit" onclick="editChit('${String(c.id)}')">✎</button><button class="icon-action delete" type="button" title="Delete Chit" aria-label="Delete Chit" onclick="deleteChit('${String(c.id)}')">⌫</button></div></div><div class="chit-card-meta"><span class="badge active">${n} MEMBERS</span></div><div class="progress"><i style="width:${Math.min(100,(c.current||0)/(c.duration||1)*100)}%"></i></div><div class="muted">Monthly ${money(c.monthly||0)} · ${c.current||0}/${c.duration||0} months</div><button class="small-link" onclick="openGroupMembers('${c.id}')">View ${n} group members →</button></div>`}).join(''):'<div class="empty">No chits yet.<br><br><button class="btn gold" onclick="newChit()">Create your first chit</button></div>'}</div>`;}
 
 function editChit(id){
@@ -109,61 +73,88 @@ function confirmDeleteChit(id){
 function newChit(){openModal('Create New Chit',`<div class="form"><input id="fName" placeholder="Chit name"><input id="fAmount" type="number" placeholder="Total amount ₹"><input id="fDuration" type="number" placeholder="Duration (months)"><select id="fType"><option value="fixed">Fixed Chit</option><option value="dividend">Dividend Chit</option></select><input id="fCommission" type="number" placeholder="Commission % (optional)"><button class="btn gold full" onclick="createChit()">Create Chit</button></div>`);}
 function createChit(){const name=document.getElementById('fName').value.trim(),amount=Number(document.getElementById('fAmount').value),duration=Number(document.getElementById('fDuration').value),type=document.getElementById('fType').value,commission=Number(document.getElementById('fCommission').value||0);if(!name||!amount||!duration)return alert('Please enter chit name, amount and duration.');state.chits.push({id:Date.now(),name,amount,duration,current:0,monthly:amount/duration,type,commission});save();closeModal();render();}
 function members(){if(!state.chits.length)return `<div class="row"><div><h2 class="page-title">Members</h2><div class="subtitle">Create a chit group first.</div></div></div><div class="empty big-empty"><div class="empty-icon">♙</div><b>No chit groups available</b><p>Add a chit first. Members will be added <strong>group-wise</strong> only to the chit you select.</p><button class="btn gold" onclick="newChit()">+ Create Chit</button></div>`;return `<div class="row"><div><h2 class="page-title">Members</h2><div class="subtitle">${state.members.length} registered members • Group wise</div></div><button class="btn gold" onclick="newMember()">+ Add</button></div><div class="group-tabs">${state.chits.map((c,i)=>`<button class="group-pill ${i===0?'selected':''}" onclick="showGroup('${c.id}',this)">${esc(c.name)} <b>${membersForChit(c.id).length}</b></button>`).join('')}</div><div id="groupMembers">${groupMemberPanel(state.chits[0].id)}</div>`;}
-function groupMemberPanel(id){
-  const c=chitById(id); if(!c) return '<div class="empty">Chit group not found.</div>';
-  const list=membersForChit(id), month=new Date().toISOString().slice(0,7);
-  const memberHtml=list.length ? list.map(m=>{
-    const avatar=esc((m.name||'?')[0]).toUpperCase(), paid=paymentFor(m.id,month);
-    return `<div class="card member">
-      <div class="avatar">${avatar}</div>
-      <div style="flex:1">
-        <div class="chit-title">${esc(m.name)}</div>
-        <div class="muted">${esc(m.phone||'No phone')} • Member #${esc(m.memberNo||'—')}</div>
-        <div class="muted">Joined ${esc(m.joiningDate||'—')} • Monthly ${money(m.monthly||c.monthly||0)}</div>
-        <div class="member-actions">
-          <button class="action-btn collect" onclick="collectMember('${String(m.id)}','${String(c.id)}')">${paid?'✓ Paid':'₹ Collect'}</button>
-          <button class="action-btn edit" onclick="editMember('${String(m.id)}')">✎ Edit</button>
-          <button class="action-btn delete" onclick="deleteMember('${String(m.id)}')">⌫ Delete</button>
-        </div>
-      </div>
-      <span class="badge ${paid?'active':'pending'}">${paid?'PAID':'PENDING'}</span>
-    </div>`;
-  }).join('') : `<div class="empty">No members in this chit yet.<br><br><button class="btn gold" onclick="newMember('${String(c.id)}')">+ Add member to ${esc(c.name)}</button></div>`;
-  return `<div class="group-head"><div><h3>${esc(c.name)}</h3><span>${c.type==='dividend'?'Dividend':'Fixed'} • Monthly ${money(c.monthly||0)}</span></div><span class="badge active">${list.length} MEMBERS</span></div><div class="list">${memberHtml}</div>`;
-}
 function showGroup(id,el){document.querySelectorAll('.group-pill').forEach(x=>x.classList.remove('selected'));el.classList.add('selected');document.getElementById('groupMembers').innerHTML=groupMemberPanel(id);}
 function openGroupMembers(id){tab='members';render();setTimeout(()=>{const btn=[...document.querySelectorAll('.group-pill')].find(x=>x.textContent.trim().startsWith(chitById(id)?.name||'§'));if(btn)showGroup(id,btn);},0);}
 function newMember(preselect=''){if(!state.chits.length)return alert('Please create a chit group first.');openModal('Add Member — Select Chit Group',`<div class="form"><label class="field-label">Chit Group <span>*</span></label><select id="mChit">${state.chits.map(c=>`<option value="${c.id}" ${String(c.id)===String(preselect)?'selected':''}>${esc(c.name)} • ${c.type==='dividend'?'Dividend':'Fixed'} • ${money(c.monthly||0)}/month</option>`).join('')}</select><label class="field-label">Member details</label><input id="mName" placeholder="Member name"><input id="mPhone" type="tel" placeholder="Phone number"><input id="mNo" placeholder="Member number (optional)"><input id="mDate" type="date" value="${new Date().toISOString().slice(0,10)}"><input id="mMonthly" type="number" placeholder="Monthly amount ₹ (optional)"><button class="btn gold full" onclick="createMember()">Add to Selected Chit</button><div class="form-note">Only members added to the selected chit will appear in that group, and only those members can be used for that group's auction.</div></div>`);}
 function createMember(){const chitId=document.getElementById('mChit').value,name=document.getElementById('mName').value.trim();if(!name)return alert('Enter member name.');const c=chitById(chitId),monthly=Number(document.getElementById('mMonthly').value||c.monthly||0);state.members.push({id:Date.now(),name,phone:document.getElementById('mPhone').value.trim(),memberNo:document.getElementById('mNo').value.trim(),joiningDate:document.getElementById('mDate').value,chitIds:[chitId],monthly});save();closeModal();tab='members';render();setTimeout(()=>{const btn=document.querySelector('.group-pill'); if(btn)showGroup(chitId,[...document.querySelectorAll('.group-pill')].find(x=>x.textContent.trim().startsWith(c.name))||btn)},0);}
 
+function editMember(id){
+  const m=state.members.find(x=>String(x.id)===String(id)); if(!m)return;
+  openModal('Edit Member',`<div class="form">
+    <label class="field-label">Member name</label><input id="emName" value="${esc(m.name)}" placeholder="Member name">
+    <label class="field-label">Phone number</label><input id="emPhone" type="tel" value="${esc(m.phone||'')}" placeholder="Phone number">
+    <label class="field-label">Member number</label><input id="emNo" value="${esc(m.memberNo||'')}" placeholder="Member number (optional)">
+    <label class="field-label">Joining date</label><input id="emDate" type="date" value="${esc(m.joiningDate||'')}">
+    <label class="field-label">Monthly amount ₹</label><input id="emMonthly" type="number" value="${Number(m.monthly||0)}" placeholder="Monthly amount ₹">
+    <button class="btn gold full" onclick="updateMember('${String(id).replace(/'/g,"\'")}')">Save Changes</button>
+  </div>`);
+}
+function updateMember(id){
+  const m=state.members.find(x=>String(x.id)===String(id)); if(!m)return;
+  const name=document.getElementById('emName').value.trim();
+  if(!name)return alert('Enter member name.');
+  m.name=name;
+  m.phone=document.getElementById('emPhone').value.trim();
+  m.memberNo=document.getElementById('emNo').value.trim();
+  m.joiningDate=document.getElementById('emDate').value;
+  m.monthly=Number(document.getElementById('emMonthly').value||0);
+  save(); closeModal(); render();
+}
+function deleteMember(id){
+  const m=state.members.find(x=>String(x.id)===String(id)); if(!m)return;
+  openModal('Delete Member',`<div class="delete-dialog">
+    <div class="delete-icon">⌫</div><h3>Delete "${esc(m.name)}"?</h3>
+    <p>This will permanently remove this member along with their payment and auction records.</p>
+    <div class="delete-actions"><button class="btn cancel-btn" onclick="closeModal()">Cancel</button><button class="btn danger full" onclick="confirmDeleteMember('${String(id).replace(/'/g,"\'")}')">Yes, Delete</button></div>
+  </div>`);
+}
+function confirmDeleteMember(id){
+  const sid=String(id);
+  state.members=state.members.filter(m=>String(m.id)!==sid);
+  state.payments=state.payments.filter(p=>String(p.memberId)!==sid);
+  state.auctions=state.auctions.filter(a=>String(a.memberId)!==sid);
+  save(); closeModal(); render();
+}
+function savePayment(memberId,chitId,month){
+  const m=state.members.find(x=>String(x.id)===String(memberId)),c=chitById(chitId);
+  if(!m||!c)return;
+  const amount=Number(document.getElementById('pAmount')?.value||0);
+  if(amount<=0)return alert('Enter a valid amount.');
+  const date=document.getElementById('pDate')?.value||new Date().toISOString().slice(0,10);
+  const mode=document.getElementById('pMode')?.value||'Cash';
+  const note=(document.getElementById('pNote')?.value||'').trim();
+  let p=paymentFor(memberId,month);
+  if(p){
+    p.amount=amount; p.date=date; p.mode=mode; p.note=note;
+  }else{
+    p={id:Date.now(),memberId:m.id,member:m.name,chitId:c.id,chit:c.name,month,amount,date,mode,note,status:'paid'};
+    state.payments.unshift(p);
+  }
+  save(); closeModal(); render();
+}
+function collectMember(memberId,chitId){
+  const m=state.members.find(x=>String(x.id)===String(memberId)),c=chitById(chitId);
+  if(!m||!c)return;
+  const month=collectionMonthValue||new Date().toISOString().slice(0,7),existing=paymentFor(memberId,month),expected=Number(m.monthly||c.monthly||0);
+  openModal(existing?'Payment Details':'Collect Payment',`<div class="payment-modal"><div class="payment-person"><div class="avatar">${esc((m.name||'?')[0]).toUpperCase()}</div><div><b>${esc(m.name)}</b><div class="muted">${esc(c.name)} • ${month} • Expected ${money(expected)}</div></div></div><div class="form"><label class="field-label">Amount paid</label><input id="pAmount" type="number" value="${existing?Number(existing.amount):expected}"><label class="field-label">Payment date</label><input id="pDate" type="date" value="${existing?esc(existing.date):new Date().toISOString().slice(0,10)}"><label class="field-label">Payment mode</label><select id="pMode"><option ${existing?.mode==='Cash'?'selected':''}>Cash</option><option ${existing?.mode==='UPI'?'selected':''}>UPI</option><option ${existing?.mode==='Bank'?'selected':''}>Bank</option></select><input id="pNote" placeholder="Note (optional)" value="${esc(existing?.note||'')}"><button class="btn gold full" onclick="savePayment('${String(memberId)}','${String(chitId)}','${month}')">${existing?'Update Payment':'Save Payment'}</button>${existing?`<button class="btn full" onclick="printReceipt('${String(existing.id)}')">🧾 Print ${receiptNo(existing)}</button><button class="btn danger-outline full" onclick="deletePayment('${String(existing.id)}')">⌫ Delete Payment</button>`:''}<button class="btn full" onclick="whatsappPaymentReminder('${String(memberId)}','${String(chitId)}')">💬 WhatsApp Reminder</button></div></div>`);
+}
 function paymentFor(memberId,month){return state.payments.find(p=>String(p.memberId)===String(memberId)&&p.month===month);}
 function receiptNo(p){if(!p)return '—'; if(p.receiptNo)return p.receiptNo; const d=String(p.date||'').replace(/-/g,'').slice(0,6)||'000000'; const idx=state.payments.indexOf(p)+1; return 'MQ-'+d+'-'+String(idx).padStart(4,'0');}
 function paymentStatus(p,expected){if(!p)return 'pending';const a=Number(p.amount||0),e=Number(expected||0);return a>=e?'paid':'partial';}
 function deletePayment(id){const p=state.payments.find(x=>String(x.id)===String(id));if(!p)return;if(!confirm('Delete receipt '+receiptNo(p)+'? This payment record will be removed.'))return;state.payments=state.payments.filter(x=>String(x.id)!==String(id));save();closeModal();render();}
 function editPayment(id){const p=state.payments.find(x=>String(x.id)===String(id));if(!p)return;const m=state.members.find(x=>String(x.id)===String(p.memberId));const c=chitById(p.chitId);openModal('Edit Payment',`<div class="payment-person"><div class="avatar">${esc((m?.name||p.member||'?')[0]).toUpperCase()}</div><div><b>${esc(m?.name||p.member||'Member')}</b><div class="muted">${esc(c?.name||p.chit||'')} • ${esc(p.month||'')}</div></div></div><div class="form"><label class="field-label">Amount paid</label><input id="epAmount" type="number" value="${Number(p.amount||0)}"><label class="field-label">Payment date</label><input id="epDate" type="date" value="${esc(p.date||'')}"><label class="field-label">Mode</label><select id="epMode"><option ${p.mode==='Cash'?'selected':''}>Cash</option><option ${p.mode==='UPI'?'selected':''}>UPI</option><option ${p.mode==='Bank'?'selected':''}>Bank</option></select><input id="epNote" placeholder="Note" value="${esc(p.note||'')}"><button class="btn gold full" onclick="updatePayment('${String(id)}')">Save Changes</button><button class="btn danger-outline full" onclick="deletePayment('${String(id)}')">Delete Payment</button></div>`);}
 function updatePayment(id){const p=state.payments.find(x=>String(x.id)===String(id));if(!p)return;const amount=Number(document.getElementById('epAmount').value||0);if(amount<=0)return alert('Enter a valid amount.');p.amount=amount;p.date=document.getElementById('epDate').value;p.mode=document.getElementById('epMode').value;p.note=document.getElementById('epNote').value.trim();save();closeModal();render();}
-function collectMember(memberId,chitId){const m=state.members.find(x=>String(x.id)===String(memberId)),c=chitById(chitId);if(!m||!c)return;const month=collectionMonthValue||new Date().toISOString().slice(0,7),existing=paymentFor(memberId,month),expected=Number(m.monthly||c.monthly||0);openModal(existing?'Payment Details':'Collect Payment',`<div class="payment-modal"><div class="payment-person"><div class="avatar">${esc((m.name||'?')[0]).toUpperCase()}</div><div><b>${esc(m.name)}</b><div class="muted">${esc(c.name)} • ${month} • Expected ${money(expected)}</div></div></div><div class="form"><label class="field-label">Amount paid</label><input id="pAmount" type="number" value="${existing?Number(existing.amount):expected}"><label class="field-label">Payment date</label><input id="pDate" type="date" value="${existing?esc(existing.date):new Date().toISOString().slice(0,10)}"><label class="field-label">Payment mode</label><select id="pMode"><option ${existing?.mode==='Cash'?'selected':''}>Cash</option><option ${existing?.mode==='UPI'?'selected':''}>UPI</option><option ${existing?.mode==='Bank'?'selected':''}>Bank</option></select><input id="pNote" placeholder="Note (optional)" value="${esc(existing?.note||'')}"><button class="btn gold full" onclick="savePayment('${String(memberId)}','${String(chitId)}','${month}')">${existing?'Update Payment':'Save Payment'}</button>${existing?`<button class="btn full" onclick="printReceipt('${String(existing.id)}')">🧾 Print ${receiptNo(existing)}</button><button class="btn danger-outline full" onclick="deletePayment('${String(existing.id)}')">⌫ Delete Payment</button>`:''}<button class="btn full" onclick="whatsappPaymentReminder('${String(memberId)}','${String(chitId)}')">💬 WhatsApp Reminder</button></div></div>`);}
 function collection(){if(!state.chits.length)return `<h2 class="page-title">Collection</h2><div class="subtitle">Monthly member payments</div><div class="empty big-empty"><b>Create a chit group first</b><p>Then you can track paid, partial and pending monthly collections.</p><button class="btn gold" onclick="newChit()">+ Create Chit</button></div>`;const c=state.chits[0],month=collectionMonthValue;return `<div class="row"><div><h2 class="page-title">Collection</h2><div class="subtitle">Paid • Partial • Pending</div></div><input class="month-picker" id="collectionMonth" type="month" value="${month}" onchange="setCollectionMonth(this.value)"></div><div class="form collection-filter"><label class="field-label">Chit Group</label><select id="collectionChit" onchange="renderCollectionGroup()">${state.chits.map(x=>`<option value="${x.id}">${esc(x.name)} • ${x.type==='dividend'?'Dividend':'Fixed'}</option>`).join('')}</select></div><div id="collectionGroup">${collectionGroup(c.id,month)}</div><div class="section"><h3>Payment History</h3><span class="muted">${state.payments.length} records</span></div><div class="list">${state.payments.length?state.payments.slice(0,30).map(p=>`<div class="card payment-row"><div style="flex:1"><b>${esc(p.member)}</b><div class="muted">${esc(p.chit)} • ${esc(p.month)} • ${esc(p.date)} • ${esc(p.mode)} • ${receiptNo(p)}</div></div><div style="text-align:right"><b>${money(p.amount)}</b><div><button class="mini-btn" onclick="editPayment('${String(p.id)}')">✎</button> <button class="mini-btn" onclick="printReceipt('${String(p.id)}')">🧾</button></div></div></div>`).join(''):'<div class="empty">No payment history yet.</div>'}</div>`;}
 function setCollectionMonth(value){collectionMonthValue=value||new Date().toISOString().slice(0,7);renderCollectionGroup();}
 function collectionGroup(id,month){const c=chitById(id),list=membersForChit(id);if(!c)return '';let paid=0,partial=0,pending=0,total=0,expected=0;list.forEach(m=>{const e=Number(m.monthly||c.monthly||0),p=paymentFor(m.id,month);expected+=e;if(!p)pending++;else if(Number(p.amount||0)>=e)paid++;else partial++;if(p)total+=Number(p.amount||0);});return `<div class="collection-stats"><div class="card"><span>Expected</span><b>${money(expected)}</b></div><div class="card"><span>Collected</span><b>${money(total)}</b></div><div class="card"><span>Balance</span><b>${money(Math.max(0,expected-total))}</b></div></div><div class="collection-summary"><span class="badge active">${paid} PAID</span><span class="badge partial">${partial} PARTIAL</span><span class="badge pending">${pending} PENDING</span></div><div class="payment-list"><div class="section"><h3>Members</h3><span class="muted">${list.length} members</span></div>${list.length?list.map(m=>{const p=paymentFor(m.id,month),e=Number(m.monthly||c.monthly||0),st=paymentStatus(p,e),label=st==='paid'?'PAID':st==='partial'?'PARTIAL':'PENDING';return `<div class="card payment-member"><div class="avatar">${esc((m.name||'?')[0]).toUpperCase()}</div><div style="flex:1"><b>${esc(m.name)}</b><div class="muted">Expected ${money(e)} ${p?'• Paid '+money(p.amount):''}</div></div><span class="badge ${st==='paid'?'active':st==='partial'?'partial':'pending'}">${label}</span><button class="action-btn ${p?'edit':'collect'}" onclick="collectMember('${String(m.id)}','${String(id)}')">${p?'Edit':'Collect'}</button>${!p?`<button class="mini-btn" onclick="whatsappPaymentReminder('${String(m.id)}','${String(id)}')">💬</button>`:''}</div>`}).join(''):'<div class="empty">No members in this group.</div>'}</div>`;}
 function renderCollectionGroup(){const id=document.getElementById('collectionChit').value;document.getElementById('collectionGroup').innerHTML=collectionGroup(id,collectionMonthValue);}
-function reports(){const col=state.payments.reduce((s,p)=>s+Number(p.amount||0),0);return `<h2 class="page-title">Reports</h2><div class="subtitle">Group-wise overview</div><div class="grid"><div class="card"><div class="stat-label">CHITS</div><div class="stat-value">${state.chits.length}</div></div><div class="card"><div class="stat-label">MEMBERS</div><div class="stat-value">${state.members.length}</div></div><div class="card"><div class="stat-label">COLLECTION</div><div class="stat-value">${money(col)}</div></div><div class="card"><div class="stat-label">AUCTIONS</div><div class="stat-value">${state.auctions.length}</div></div></div>${state.chits.map(c=>`<div class="card report-group"><div class="row"><b>${esc(c.name)}</b><span class="badge active">${membersForChit(c.id).length} MEMBERS</span></div><div class="muted">${c.type==='dividend'?'Dividend':'Fixed'} • Monthly ${money(c.monthly||0)} • Auctions ${state.auctions.filter(a=>String(a.chitId)===String(c.id)).length}</div></div>`).join('')}`;}
 function openModal(title,body){document.getElementById('modalTitle').textContent=title;document.getElementById('modalBody').innerHTML=body;document.getElementById('modal').classList.remove('hidden');}
 function closeModal(){document.getElementById('modal').classList.add('hidden');}
-const _localSave=save; save=function(){_localSave();if(supa)pushToSupabase();};
-function bootMithraQ(){
-  try{
-    authUser=getAuth();
-    const modal=document.getElementById('modal');
-    if(modal)modal.addEventListener('click',e=>{if(e.target.id==='modal')closeModal();});
-    document.querySelectorAll('.bottom-nav button').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;render();});
-    if(authUser)showApp();else showLogin();
-  }catch(e){
-    const root=document.getElementById('authRoot');
-    if(root)root.innerHTML='<div class="auth-screen"><div class="auth-card"><h1>MithraQ</h1><p class="auth-sub">App could not start.</p><div class="auth-note">'+esc(e?.message||'Unknown error')+'</div><button class="btn gold full" onclick="location.reload()">Reload</button></div></div>';
-  }
-}
-window.addEventListener('load',bootMithraQ);
+window.addEventListener('load',()=>{authUser=getAuth();if(authUser)showApp();else showLogin();});
+document.getElementById('modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();});
+const _localSave=save; save=function(){_localSave(); if(supa) pushToSupabase();};
+document.querySelectorAll('.bottom-nav button').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;render();});
+render();
 
 /* ===== MithraQ Professional Phase 3 ===== */
 function memberPayments(memberId){return state.payments.filter(p=>String(p.memberId)===String(memberId)).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));}
@@ -204,16 +195,9 @@ function home(){
   const recent=dashboardRecent();
   return `<h2 class="page-title">Good day 👋</h2><div class="subtitle">MithraQ • Smart Chit Management</div><div class="hero"><small>♛ TOTAL CHIT PORTFOLIO</small><h2>${money(total)}</h2><div class="muted hero-muted">Collections, members, auctions and dividends in one place.</div></div>
   <div class="grid"><div class="card"><div class="stat-label">ACTIVE CHITS</div><div class="stat-value">${state.chits.length}</div></div><div class="card"><div class="stat-label">MEMBERS</div><div class="stat-value">${state.members.length}</div></div><div class="card"><div class="stat-label">COLLECTED</div><div class="stat-value">${money(col)}</div></div><div class="card"><div class="stat-label">THIS MONTH PENDING</div><div class="stat-value">${money(pending)}</div></div></div>
-  <div class="section"><h3>Quick Actions</h3><span class="muted">Together We Grow</span></div><div class="quick-grid"><button class="quick" onclick="newChit()"><b>＋</b><span>New Chit</span></button><button class="quick" onclick="newMember()"><b>♙</b><span>Member</span></button><button class="quick" onclick="tab='collection';render()"><b>₹</b><span>Collection</span></button><button class="quick" onclick="tab='search';render()"><b>⌕</b><span>Search</span></button></div>
+  <div class="section"><h3>Quick Actions</h3><span class="muted">Together We Grow</span></div><div class="quick-grid"><button class="quick" onclick="newChit()"><b>＋</b><span>New Chit</span></button><button class="quick" onclick="newMember()"><b>♙</b><span>Member</span></button><button class="quick" onclick="tab='collection';render()"><b>₹</b><span>Collection</span></button><button class="quick" onclick="tab='search';render()"><b>⌕</b><span>Search</span></button><button class="quick" onclick="tab='settings';render()"><b>⚙</b><span>Settings</span></button></div>
   <div class="section"><h3>Recent Activity</h3><span class="muted">Latest transactions</span></div><div class="activity-list">${recent.length?recent.map(x=>`<div class="card activity-row"><div class="activity-icon">${x.type==='payment'?'₹':'🔨'}</div><div><b>${esc(x.title)}</b><div class="muted">${esc(x.sub)} • ${esc(x.time)}</div></div></div>`).join(''):'<div class="empty recent">No transactions yet.</div>'}</div>`;
 }
-function groupMemberPanel(id){
-  const c=chitById(id);if(!c)return '<div class="empty">Chit group not found.</div>';const list=membersForChit(id),month=new Date().toISOString().slice(0,7);
-  const memberHtml=list.length?list.map(m=>{const avatar=esc((m.name||'?')[0]).toUpperCase(),paid=paymentFor(m.id,month);return `<div class="card member"><div class="avatar">${avatar}</div><div style="flex:1"><div class="chit-title">${esc(m.name)}</div><div class="muted">${esc(m.phone||'No phone')} • Member #${esc(m.memberNo||'—')}</div><div class="muted">Joined ${esc(m.joiningDate||'—')} • Monthly ${money(m.monthly||c.monthly||0)}</div><div class="member-actions"><button class="action-btn collect" onclick="collectMember('${String(m.id)}','${String(c.id)}')">${paid?'✓ Paid':'₹ Collect'}</button><button class="action-btn edit" onclick="editMember('${String(m.id)}')">✎ Edit</button><button class="action-btn" onclick="memberStatement('${String(m.id)}')">▤ Statement</button><button class="action-btn" onclick="whatsappPaymentReminder('${String(m.id)}','${String(c.id)}')">💬 Reminder</button><button class="action-btn delete" onclick="deleteMember('${String(m.id)}')">⌫ Delete</button></div></div><span class="badge ${paid?'active':'pending'}">${paid?'PAID':'PENDING'}</span></div>`}).join(''):`<div class="empty">No members in this chit yet.<br><br><button class="btn gold" onclick="newMember('${String(c.id)}')">+ Add member to ${esc(c.name)}</button></div>`;
-  return `<div class="group-head"><div><h3>${esc(c.name)}</h3><span>${c.type==='dividend'?'Dividend':'Fixed'} • Monthly ${money(c.monthly||0)}</span></div><span class="badge active">${list.length} MEMBERS</span></div><div class="list">${memberHtml}</div>`;
-}
-function collectMember(memberId,chitId){const m=state.members.find(x=>String(x.id)===String(memberId)),c=chitById(chitId);if(!m||!c)return;const month=collectionMonthValue||new Date().toISOString().slice(0,7),existing=paymentFor(memberId,month);openModal(existing?'Payment Details':'Collect Payment',`<div class="payment-modal"><div class="payment-person"><div class="avatar">${esc((m.name||'?')[0]).toUpperCase()}</div><div><b>${esc(m.name)}</b><div class="muted">${esc(c.name)} • ${month}</div></div></div><div class="form"><label class="field-label">Monthly amount</label><input id="pAmount" type="number" value="${existing?Number(existing.amount):Number(m.monthly||c.monthly||0)}"><label class="field-label">Payment date</label><input id="pDate" type="date" value="${existing?esc(existing.date):new Date().toISOString().slice(0,10)}"><label class="field-label">Payment mode</label><select id="pMode"><option ${existing?.mode==='Cash'?'selected':''}>Cash</option><option ${existing?.mode==='UPI'?'selected':''}>UPI</option><option ${existing?.mode==='Bank'?'selected':''}>Bank</option></select><input id="pNote" placeholder="Note (optional)" value="${esc(existing?.note||'')}"><button class="btn gold full" onclick="savePayment('${String(memberId)}','${String(chitId)}','${month}')">${existing?'Update Payment':'Mark as Paid'}</button>${existing?`<button class="btn full" onclick="printReceipt('${String(existing.id)}')">🧾 Print Receipt</button>`:''}<button class="btn full" onclick="whatsappPaymentReminder('${String(memberId)}','${String(chitId)}')">💬 WhatsApp Reminder</button></div></div>`);}
-function reports(){const col=state.payments.reduce((s,p)=>s+Number(p.amount||0),0),expected=state.members.reduce((s,m)=>{const c=(m.chitIds||[]).map(chitById).find(Boolean);return s+Number(m.monthly||c?.monthly||0)},0),pending=Math.max(0,expected-col);return `<h2 class="page-title">Reports</h2><div class="subtitle">Professional collection & auction overview</div><div class="grid"><div class="card"><div class="stat-label">CHITS</div><div class="stat-value">${state.chits.length}</div></div><div class="card"><div class="stat-label">MEMBERS</div><div class="stat-value">${state.members.length}</div></div><div class="card"><div class="stat-label">COLLECTION</div><div class="stat-value">${money(col)}</div></div><div class="card"><div class="stat-label">PENDING</div><div class="stat-value">${money(pending)}</div></div></div><div class="report-actions"><button class="btn gold" onclick="exportPaymentsCSV()">⬇️ Export Payments</button><button class="btn" onclick="exportMembersCSV()">⬇️ Export Members</button></div>${state.chits.map(c=>{const ms=membersForChit(c.id),paid=ms.filter(m=>paymentFor(m.id,new Date().toISOString().slice(0,7))).length,auc=state.auctions.filter(a=>String(a.chitId)===String(c.id)).length;return `<div class="card report-group"><div class="row"><b>${esc(c.name)}</b><span class="badge active">${ms.length} MEMBERS</span></div><div class="muted">${c.type==='dividend'?'Dividend':'Fixed'} • Monthly ${money(c.monthly||0)} • ${paid} paid this month • ${auc} auctions</div></div>`}).join('')}`;}
 function exportPaymentsCSV(){const rows=[['Receipt No','Member','Phone','Chit','Month','Amount','Date','Mode','Status','Note'],...state.payments.map(p=>{const m=state.members.find(x=>String(x.id)===String(p.memberId));return[receiptNo(p),m?.name||p.member,m?.phone||'',p.chit,p.month,p.amount,p.date,p.mode,p.status||'paid',p.note||''];})];downloadCSV(rows,'mithraq-payments.csv');}
 function exportMembersCSV(){const rows=[['Member ID','Member No','Name','Phone','Joining Date','Monthly','Groups'],...state.members.map(m=>[m.id,m.memberNo||'',m.name,m.phone||'',m.joiningDate||'',m.monthly||'',(m.chitIds||[]).map(id=>chitById(id)?.name||'').join(' | ')] )];downloadCSV(rows,'mithraq-members.csv');}
 function downloadCSV(rows,name){const csv=rows.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\n');const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
