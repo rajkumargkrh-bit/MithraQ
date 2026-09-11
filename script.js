@@ -290,15 +290,15 @@ function auction(){
   <div class="card auction-live-card">
     <div class="section no-margin"><div><h3>${esc(c.name)}</h3><span class="muted">${ms.length} members • ${money(c.amount)} chit value</span></div><span class="live-dot">● LIVE</span></div>
     ${!auctionRunning&&!last?`<div class="live-start-panel"><div class="live-big">LIVE</div><div class="muted">Press START to begin bidding.</div><button class="btn gold full" id="auctionTimerBtn" onclick="startAuctionTimer()">START</button></div>`:''}
-    ${auctionRunning||last?`<div class="form">
+    ${auctionRunning?`<div class="form">
       <label class="field-label">Bidder</label>
       <select id="auctionMember">${ms.length?ms.map(m=>`<option value="${String(m.id)}">${esc(m.name)} • #${esc(m.memberNo||'—')}</option>`).join(''):'<option value="">No members in this group</option>'}</select>
       <label class="field-label">Bid amount ₹</label>
       <div class="bid-submit-row"><input id="bid" type="number" min="1" max="${Number(c.amount||0)}" placeholder="Enter bid amount" onkeydown="if(event.key==='Enter'){event.preventDefault();submitAuctionBid();}"><button class="btn submit-bid-btn" type="button" onclick="submitAuctionBid()">SUBMIT</button></div>
       ${bidHistory}
-      <div class="timer-card"><div><span>AUCTION TIME</span><strong id="timer">${String(Math.floor(auctionSeconds/60)).padStart(2,'0')}:${String(auctionSeconds%60).padStart(2,'0')}</strong></div><button class="timer-btn" id="auctionTimerBtn" onclick="startAuctionTimer()">${auctionRunning?'STOP':'STOP'}</button></div>
-      ${winnerText}
+      <div class="timer-card"><div><span>AUCTION TIME</span><strong id="timer">${String(Math.floor(auctionSeconds/60)).padStart(2,'0')}:${String(auctionSeconds%60).padStart(2,'0')}</strong></div><button class="timer-btn auction-stop-btn" id="auctionTimerBtn" onclick="startAuctionTimer()">STOP</button></div>
     </div>`:''}
+    ${!auctionRunning&&last?`<div class="auction-finished-panel">${bidHistory}${winnerText}<div class="auction-ended-label">AUCTION ENDED</div></div>`:''}
   </div>
   <div class="section"><h3>Round History</h3><span class="muted">${records.length} auction record(s)</span></div>
   <div class="list">${records.length?records.map(a=>auctionRecordHtml(a,c)).join(''):'<div class="empty">No auction records for this group yet.</div>'}</div>`;
