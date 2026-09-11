@@ -231,7 +231,7 @@ function exportPendingCSV(month){const rows=[['Member','Phone','Chit','Expected'
 /* ===== MithraQ Professional Phase 7: Full Auction Room ===== */
 let auctionGroupValue='';
 let auctionRoundValue=1;
-let auctionTimer=null, auctionSeconds=30;
+let auctionTimer=null, auctionSeconds=0, auctionRunning=false;
 function defaultDueDate(){const d=new Date();d.setMonth(d.getMonth()+1);d.setDate(5);return d.toISOString().slice(0,10);}
 function formatDMY(iso){if(!iso)return '—';const parts=String(iso).split('-');if(parts.length!==3)return esc(iso);const [y,m,d]=parts;return `${d}.${m}.${y}`;}
 function auctionFinance(c,bid,memberCount){
@@ -259,7 +259,7 @@ function auction(){
   <div class="form"><label class="field-label">Bidder / Winner</label><select id="auctionMember">${ms.length?ms.map(m=>`<option value="${String(m.id)}">${esc(m.name)} • #${esc(m.memberNo||'—')}</option>`).join(''):'<option value="">No members in this group</option>'}</select><div class="form-note">Only members belonging to <b>${esc(c.name)}</b> can be selected.</div>
   <label class="field-label">Bid amount / discount ₹</label><input id="bid" type="number" min="1" max="${Number(c.amount||0)}" placeholder="Enter winning bid">
   <label class="field-label">Due Date</label><input id="dueDate" type="date" value="${defaultDueDate()}">
-  <div class="timer-card"><div><span>ROUND</span><strong id="roundNo">${auctionRoundValue}</strong> <small>/ 3</small></div><div id="timer">00:${String(auctionSeconds).padStart(2,'0')}</div><button class="timer-btn" onclick="startAuctionTimer()">START</button></div>
+  <div class="timer-card"><div><span>ROUND</span><strong id="roundNo">${auctionRoundValue}</strong> <small>/ 3</small></div><div id="timer">00:${String(auctionSeconds).padStart(2,'0')}</div><button class="timer-btn" id="auctionTimerBtn" onclick="startAuctionTimer()">${auctionRunning?'STOP':'START'}</button></div>
   <button class="btn gold full" onclick="saveAuction()">🏆 Confirm Winner & Save Auction</button></div></div>
   <div class="card auction-summary"><div><span>Chit Value</span><b>${money(c.amount)}</b></div><div><span>Monthly</span><b>${money(c.monthly)}</b></div><div><span>Members</span><b>${ms.length}</b></div></div>
   <div class="section"><h3>Round History</h3><span class="muted">${records.length} auction record(s)</span></div>
@@ -286,8 +286,33 @@ function auctionRecordHtml(a,c){
 }
 function selectAuctionGroup(id){auctionGroupValue=String(id);auctionRoundValue=1;render();}
 function selectAuctionRound(r){auctionRoundValue=Number(r)||1;const el=document.getElementById('roundNo');if(el)el.textContent=auctionRoundValue;document.querySelectorAll('.round-pill').forEach((b,i)=>b.classList.toggle('selected',i+1===auctionRoundValue));}
-function startAuctionTimer(){clearInterval(auctionTimer);auctionSeconds=30;const t=document.getElementById('timer'),r=document.getElementById('roundNo');if(!t||!r)return;r.textContent=auctionRoundValue;t.textContent='00:30';auctionTimer=setInterval(()=>{auctionSeconds--;t.textContent='00:'+String(Math.max(0,auctionSeconds)).padStart(2,'0');if(auctionSeconds<=0){clearInterval(auctionTimer);if(auctionRoundValue<3){auctionRoundValue++;r.textContent=auctionRoundValue;alert('Round complete. Now Round '+auctionRoundValue+'.');}else{alert('Final round complete. Select the winner and save the auction.');}}},1000);}
-function saveAuction(){const c=chitById(auctionGroupValue)||chitById(document.getElementById('auctionChit')?.value),mid=document.getElementById('auctionMember')?.value,bid=Number(document.getElementById('bid')?.value||0);if(!c||!mid||!bid)return alert('Select a member and enter the winning bid amount.');if(bid>Number(c.amount||0))return alert('Bid cannot be greater than the chit value.');const m=state.members.find(x=>String(x.id)===String(mid));if(!m||!membersForChit(c.id).some(x=>String(x.id)===String(mid)))return alert('Selected member does not belong to this chit group.');const dueDate=document.getElementById('dueDate')?.value||defaultDueDate();const fin=auctionFinance(c,bid);const rec={id:Date.now(),chit:c.name,chitId:c.id,member:m.name,memberId:m.id,bid,round:'Round '+auctionRoundValue,chitAmount:fin.chitAmount,dividend:fin.discount,commissionAmt:fin.commissionAmt,dividendPerMember:fin.dividendPerMember,payable:fin.payable,dueDate,date:new Date().toLocaleDateString('en-IN'),createdAt:new Date().toISOString()};state.auctions.unshift(rec);save();clearInterval(auctionTimer);alert('Auction winner saved successfully.');render();}
+function startAuctionTimer(){
+  const t=document.getElementById('timer'),r=document.getElementById('roundNo'),btn=document.getElementById('auctionTimerBtn');
+  if(!t||!r)return;
+  if(!auctionRunning){
+    /* START: bidding goes live for this round. Keep updating Bidder/Winner + Bid amount as members call out bids. */
+    auctionRunning=true;
+    auctionSeconds=0;
+    r.textContent=auctionRoundValue;
+    t.textContent='00:00';
+    if(btn)btn.textContent='STOP';
+    clearInterval(auctionTimer);
+    auctionTimer=setInterval(()=>{auctionSeconds++;const mm=Math.floor(auctionSeconds/60),ss=auctionSeconds%60;t.textContent=String(mm).padStart(2,'0')+':'+String(ss).padStart(2,'0');},1000);
+  }else{
+    /* STOP: bidding closes. Whoever is currently selected as Bidder/Winner with the entered bid is the last bid, i.e. the round winner. */
+    auctionRunning=false;
+    clearInterval(auctionTimer);
+    if(btn)btn.textContent='START';
+    const memberSel=document.getElementById('auctionMember'),bidInput=document.getElementById('bid');
+    const opt=memberSel&&memberSel.selectedIndex>-1?memberSel.options[memberSel.selectedIndex]:null;
+    if(opt&&opt.value&&bidInput&&bidInput.value){
+      alert('Round '+auctionRoundValue+' bidding stopped.\n'+opt.textContent+' placed the last bid of ₹'+bidInput.value+' and is the winner.\nClick "Confirm Winner & Save Auction" to save.');
+    }else{
+      alert('Round '+auctionRoundValue+' bidding stopped. Select the last bidder and enter their bid, then confirm the winner.');
+    }
+  }
+}
+function saveAuction(){const c=chitById(auctionGroupValue)||chitById(document.getElementById('auctionChit')?.value),mid=document.getElementById('auctionMember')?.value,bid=Number(document.getElementById('bid')?.value||0);if(!c||!mid||!bid)return alert('Select a member and enter the winning bid amount.');if(bid>Number(c.amount||0))return alert('Bid cannot be greater than the chit value.');const m=state.members.find(x=>String(x.id)===String(mid));if(!m||!membersForChit(c.id).some(x=>String(x.id)===String(mid)))return alert('Selected member does not belong to this chit group.');const dueDate=document.getElementById('dueDate')?.value||defaultDueDate();const fin=auctionFinance(c,bid);const rec={id:Date.now(),chit:c.name,chitId:c.id,member:m.name,memberId:m.id,bid,round:'Round '+auctionRoundValue,chitAmount:fin.chitAmount,dividend:fin.discount,commissionAmt:fin.commissionAmt,dividendPerMember:fin.dividendPerMember,payable:fin.payable,dueDate,date:new Date().toLocaleDateString('en-IN'),createdAt:new Date().toISOString()};state.auctions.unshift(rec);save();clearInterval(auctionTimer);auctionRunning=false;alert('Auction winner saved successfully.');render();}
 function editAuction(id){const a=state.auctions.find(x=>String(x.id)===String(id));if(!a)return;const c=chitById(a.chitId),list=c?membersForChit(c.id):[];openModal('Edit Auction Result',`<div class="form"><label class="field-label">Chit Group</label><select id="eaChit" onchange="renderEditAuctionMembers()">${state.chits.map(x=>`<option value="${String(x.id)}" ${String(x.id)===String(a.chitId)?'selected':''}>${esc(x.name)}</option>`).join('')}</select><label class="field-label">Winner / Bidder</label><div id="eaMembers"><select id="eaMember">${list.map(m=>`<option value="${String(m.id)}" ${String(m.id)===String(a.memberId)?'selected':''}>${esc(m.name)} • #${esc(m.memberNo||'—')}</option>`).join('')}</select></div><label class="field-label">Round</label><select id="eaRound">${[1,2,3].map(r=>`<option value="${r}" ${String(a.round||'Round 1')==='Round '+r?'selected':''}>Round ${r}</option>`).join('')}</select><label class="field-label">Winning bid ₹</label><input id="eaBid" type="number" min="1" value="${Number(a.bid||0)}"><label class="field-label">Due Date</label><input id="eaDue" type="date" value="${esc(a.dueDate||defaultDueDate())}"><button class="btn gold full" onclick="updateAuction('${String(id)}')">Save Changes</button></div>`);}
 function renderEditAuctionMembers(){const c=chitById(document.getElementById('eaChit')?.value),el=document.getElementById('eaMembers');if(!c||!el)return;el.innerHTML=`<select id="eaMember">${membersForChit(c.id).map(m=>`<option value="${String(m.id)}">${esc(m.name)} • #${esc(m.memberNo||'—')}</option>`).join('')||'<option value="">No members</option>'}</select>`;}
 function updateAuction(id){const a=state.auctions.find(x=>String(x.id)===String(id));if(!a)return;const c=chitById(document.getElementById('eaChit')?.value),mid=document.getElementById('eaMember')?.value,bid=Number(document.getElementById('eaBid')?.value||0),r=Number(document.getElementById('eaRound')?.value||1),dueDate=document.getElementById('eaDue')?.value||a.dueDate||defaultDueDate();if(!c||!mid||!bid)return alert('Enter all auction details.');if(bid>Number(c.amount||0))return alert('Bid cannot be greater than the chit value.');const m=state.members.find(x=>String(x.id)===String(mid));const fin=auctionFinance(c,bid);a.chit=c.name;a.chitId=c.id;a.member=m?.name||'';a.memberId=mid;a.bid=bid;a.round='Round '+r;a.dueDate=dueDate;a.chitAmount=fin.chitAmount;a.dividend=fin.discount;a.commissionAmt=fin.commissionAmt;a.dividendPerMember=fin.dividendPerMember;a.payable=fin.payable;save();closeModal();render();}
