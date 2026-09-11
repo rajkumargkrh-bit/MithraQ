@@ -257,7 +257,7 @@ function auction(){
   <div class="form"><label class="field-label">Bidder / Winner</label><select id="auctionMember">${ms.length?ms.map(m=>`<option value="${String(m.id)}">${esc(m.name)} • #${esc(m.memberNo||'—')}</option>`).join(''):'<option value="">No members in this group</option>'}</select><div class="form-note">Only members belonging to <b>${esc(c.name)}</b> can be selected.</div>
   <label class="field-label">Bid amount / discount ₹</label><input id="bid" type="number" min="1" max="${Number(c.amount||0)}" placeholder="Enter winning bid">
   <label class="field-label">Due Date</label><input id="dueDate" type="date" value="${defaultDueDate()}">
-  <div class="timer-card"><div><span>ROUND</span><strong id="roundNo">${auctionRoundValue}</strong> <small>/ 3</small></div><div id="timer">00:${String(auctionSeconds).padStart(2,'0')}</div><button class="timer-btn" id="auctionTimerBtn" onclick="startAuctionTimer()">${auctionRunning?'STOP':'START'}</button></div>
+  <div class="timer-card"><div id="timer">00:${String(auctionSeconds).padStart(2,'0')}</div><button class="timer-btn" id="auctionTimerBtn" onclick="startAuctionTimer()">${auctionRunning?'STOP':'START'}</button></div>
   <button class="btn gold full" onclick="saveAuction()">🏆 Confirm Winner & Save Auction</button></div></div>
   <div class="card auction-summary"><div><span>Chit Value</span><b>${money(c.amount)}</b></div><div><span>Monthly</span><b>${money(c.monthly)}</b></div><div><span>Members</span><b>${ms.length}</b></div></div>
   <div class="section"><h3>Round History</h3><span class="muted">${records.length} auction record(s)</span></div>
@@ -285,28 +285,27 @@ function auctionRecordHtml(a,c){
 function selectAuctionGroup(id){auctionGroupValue=String(id);auctionRoundValue=1;render();}
 function selectAuctionRound(r){auctionRoundValue=Number(r)||1;const el=document.getElementById('roundNo');if(el)el.textContent=auctionRoundValue;document.querySelectorAll('.round-pill').forEach((b,i)=>b.classList.toggle('selected',i+1===auctionRoundValue));}
 function startAuctionTimer(){
-  const t=document.getElementById('timer'),r=document.getElementById('roundNo'),btn=document.getElementById('auctionTimerBtn');
-  if(!t||!r)return;
+  const t=document.getElementById('timer'),btn=document.getElementById('auctionTimerBtn');
+  if(!t)return;
   if(!auctionRunning){
-    /* START: bidding goes live for this round. Keep updating Bidder/Winner + Bid amount as members call out bids. */
+    /* START: bidding goes live. Keep updating Bidder/Winner + Bid amount as members call out bids. */
     auctionRunning=true;
     auctionSeconds=0;
-    r.textContent=auctionRoundValue;
     t.textContent='00:00';
     if(btn)btn.textContent='STOP';
     clearInterval(auctionTimer);
     auctionTimer=setInterval(()=>{auctionSeconds++;const mm=Math.floor(auctionSeconds/60),ss=auctionSeconds%60;t.textContent=String(mm).padStart(2,'0')+':'+String(ss).padStart(2,'0');},1000);
   }else{
-    /* STOP: bidding closes. Whoever is currently selected as Bidder/Winner with the entered bid is the last bid, i.e. the round winner. */
+    /* STOP: bidding closes. Whoever is currently selected as Bidder/Winner with the entered bid is the last bid, i.e. the winner. */
     auctionRunning=false;
     clearInterval(auctionTimer);
     if(btn)btn.textContent='START';
     const memberSel=document.getElementById('auctionMember'),bidInput=document.getElementById('bid');
     const opt=memberSel&&memberSel.selectedIndex>-1?memberSel.options[memberSel.selectedIndex]:null;
     if(opt&&opt.value&&bidInput&&bidInput.value){
-      alert('Round '+auctionRoundValue+' bidding stopped.\n'+opt.textContent+' placed the last bid of ₹'+bidInput.value+' and is the winner.\nClick "Confirm Winner & Save Auction" to save.');
+      alert('Bidding stopped.\n'+opt.textContent+' placed the last bid of ₹'+bidInput.value+' and is the winner.\nClick "Confirm Winner & Save Auction" to save.');
     }else{
-      alert('Round '+auctionRoundValue+' bidding stopped. Select the last bidder and enter their bid, then confirm the winner.');
+      alert('Bidding stopped. Select the last bidder and enter their bid, then confirm the winner.');
     }
   }
 }
