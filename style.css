@@ -180,3 +180,37 @@ body{background:radial-gradient(circle at top,#eaf5ef 0,#eef5f0 38%,#e8f1eb 100%
 @keyframes noticePop{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
 @keyframes noticeFade{from{opacity:0}to{opacity:1}}
 @media(max-width:430px){.notice-layer{padding:18px}.notice-card{border-radius:22px;padding:22px 18px 18px}.notice-title{font-size:19px}.notice-message{font-size:14px}.notice-actions .btn{min-width:108px}}
+
+/* ===== MithraQ Icon Polish — visual styling only ===== */
+.nav-icon,.nav-menu-circle,.menu-sheet-icon,.empty-icon,.notice-icon,.delete-icon,.activity-icon,.avatar,.big-avatar,.icon-action,.mini-btn,.modal-close{position:relative;isolation:isolate;transition:transform .18s ease,box-shadow .18s ease,background .18s ease,border-color .18s ease,filter .18s ease}
+.nav-icon{font-weight:900;text-shadow:0 1px 0 rgba(255,255,255,.75);border:1px solid rgba(5,107,79,.08)}
+.nav-item:not(.nav-menu):hover .nav-icon,.nav-item:not(.nav-menu):focus-visible .nav-icon{transform:translateY(-2px) scale(1.04);box-shadow:0 8px 16px rgba(3,74,55,.12)}
+.nav-item:not(.nav-menu):active .nav-icon{transform:scale(.94)}
+.nav-menu-circle{font-weight:900;text-shadow:0 1px 1px rgba(255,255,255,.22)}
+.nav-menu:hover .nav-menu-circle{transform:translateY(-3px) scale(1.04)}
+.nav-menu:active .nav-menu-circle{transform:scale(.95)}
+.menu-sheet-icon{font-weight:900;border-width:1px;box-shadow:0 8px 18px rgba(3,74,55,.10),inset 0 1px 0 rgba(255,255,255,.75)}
+.menu-sheet-grid button:hover .menu-sheet-icon{transform:translateY(-3px) rotate(-2deg);box-shadow:0 12px 22px rgba(3,74,55,.16),inset 0 1px 0 rgba(255,255,255,.8)}
+.menu-sheet-grid button:active .menu-sheet-icon{transform:scale(.94)}
+.icon-action{overflow:hidden;text-shadow:0 1px 0 rgba(255,255,255,.7)}
+.icon-action:before,.mini-btn:before,.modal-close:before{content:"";position:absolute;inset:0;border-radius:inherit;background:linear-gradient(135deg,rgba(255,255,255,.55),transparent 55%);opacity:.7;pointer-events:none;z-index:-1}
+.icon-action:hover{transform:translateY(-2px);box-shadow:0 8px 17px rgba(3,74,55,.13)}
+.icon-action.edit:hover{background:#e5f7ed;border-color:#b9dfcd}
+.icon-action.delete:hover{background:#ffedeb;border-color:#e7bcb7;box-shadow:0 8px 17px rgba(184,79,79,.12)}
+.mini-btn{min-width:34px;min-height:34px;display:inline-grid;place-items:center;color:var(--green);font-weight:900;border:1px solid #dcebe4;box-shadow:0 4px 10px rgba(3,74,55,.06)}
+.mini-btn:hover{transform:translateY(-2px);background:#e7f6ef;box-shadow:0 7px 14px rgba(3,74,55,.12)}
+.action-btn{transition:transform .16s ease,box-shadow .16s ease,background .16s ease,border-color .16s ease}
+.action-btn:hover{transform:translateY(-1px);box-shadow:0 6px 13px rgba(3,74,55,.08)}
+.action-btn:active,.mini-btn:active,.icon-action:active{transform:scale(.94)}
+.avatar{box-shadow:0 7px 16px rgba(3,74,55,.10),inset 0 1px 0 rgba(255,255,255,.8);border:1px solid rgba(5,107,79,.08);text-shadow:0 1px 0 rgba(255,255,255,.8)}
+.avatar:hover{transform:translateY(-2px) rotate(-1deg);box-shadow:0 10px 20px rgba(3,74,55,.14)}
+.empty-icon{display:inline-grid;place-items:center;width:62px;height:62px;border-radius:20px;background:linear-gradient(145deg,#fff9e7,#e8f7ef);border:1px solid #e1d39e;box-shadow:0 10px 22px rgba(3,74,55,.10),inset 0 1px 0 rgba(255,255,255,.9);text-shadow:0 2px 0 rgba(255,255,255,.7)}
+.empty-icon:hover{transform:translateY(-3px) rotate(-2deg);box-shadow:0 13px 25px rgba(3,74,55,.14)}
+.activity-icon{border:1px solid #d5eadf;box-shadow:0 6px 14px rgba(3,74,55,.08),inset 0 1px 0 rgba(255,255,255,.8);text-shadow:0 1px 0 rgba(255,255,255,.7)}
+.notice-icon,.delete-icon{box-shadow:0 9px 20px rgba(3,74,55,.10),inset 0 1px 0 rgba(255,255,255,.85);text-shadow:0 1px 0 rgba(255,255,255,.8)}
+.modal-close{font-weight:900;box-shadow:0 5px 12px rgba(3,74,55,.08),inset 0 1px 0 rgba(255,255,255,.8)}
+.modal-close:hover{transform:rotate(90deg) scale(1.04);background:#dff2e9}
+button:focus-visible .nav-icon,button:focus-visible .menu-sheet-icon,button:focus-visible .icon-action{outline:2px solid rgba(214,162,31,.65);outline-offset:3px}
+.btn{transition:transform .16s ease,box-shadow .16s ease,filter .16s ease}
+.btn:hover{transform:translateY(-1px);filter:saturate(1.05);box-shadow:0 10px 19px rgba(5,107,79,.18)}
+.btn:active{transform:scale(.98)}
