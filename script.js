@@ -1,9 +1,34 @@
 const AUTH_KEY="mithraq_admin_auth_v1";
 let authUser=null;
 function getAuth(){try{return JSON.parse(localStorage.getItem(AUTH_KEY)||"null")}catch(e){return null}}
-function authHash(text){return crypto.subtle.digest("SHA-256",new TextEncoder().encode(text)).then(b=>Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,"0")).join(""))}
-async function setupAdmin(){const name=(document.getElementById("setupName")?.value||"").trim(),username=(document.getElementById("setupUser")?.value||"").trim(),password=document.getElementById("setupPass")?.value||"",confirmPass=document.getElementById("setupPass2")?.value||"";if(!name||!username||password.length<6)return alert("Enter name, username and a password of at least 6 characters.");if(password!==confirmPass)return alert("Passwords do not match.");const hash=await authHash(password);localStorage.setItem(AUTH_KEY,JSON.stringify({name,username,hash,createdAt:new Date().toISOString()}));authUser=getAuth();showApp()}
-async function loginAdmin(){const username=(document.getElementById("loginUser")?.value||"").trim(),password=document.getElementById("loginPass")?.value||"",a=getAuth();if(!a)return showLogin();const hash=await authHash(password);if(username!==a.username||hash!==a.hash){const e=document.getElementById("loginError");if(e)e.textContent="Incorrect username or password.";return}authUser=a;showApp()}
+function authHash(text){
+  // WebView-safe password hashing. Prefer Web Crypto, but keep login working
+  // in Android/offline WebViews where crypto.subtle may be unavailable.
+  if(window.crypto && crypto.subtle && window.TextEncoder){
+    return crypto.subtle.digest("SHA-256",new TextEncoder().encode(text))
+      .then(b=>Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,"0")).join(""));
+  }
+  let h1=2166136261,h2=2246822519,h3=3266489917,h4=668265263;
+  const str=String(text);
+  for(let i=0;i<str.length;i++){
+    const c=str.charCodeAt(i);
+    h1=Math.imul(h1^c,16777619)>>>0;
+    h2=Math.imul(h2^(c+i),2246822519)>>>0;
+    h3=Math.imul(h3^(c*31),3266489917)>>>0;
+    h4=Math.imul(h4^(c*131),668265263)>>>0;
+  }
+  return Promise.resolve([h1,h2,h3,h4].map(n=>n.toString(16).padStart(8,"0")).join(""));
+}
+async function setupAdmin(){const name=(document.getElementById("setupName")?.value||"").trim(),username=(document.getElementById("setupUser")?.value||"").trim(),password=document.getElementById("setupPass")?.value||"",confirmPass=document.getElementById("setupPass2")?.value||"";if(!name||!username||password.length<6)return alert("Enter name, username and a password of at least 6 characters.");if(password!==confirmPass)return alert("Passwords do not match.");try{
+  const hash=await authHash(password);
+  localStorage.setItem(AUTH_KEY,JSON.stringify({name,username,hash,createdAt:new Date().toISOString()}));
+  authUser=getAuth(); showApp();
+}catch(err){ alert("Login setup failed: "+(err?.message||"Please try again.")); }}
+async function loginAdmin(){const username=(document.getElementById("loginUser")?.value||"").trim(),password=document.getElementById("loginPass")?.value||"",a=getAuth();if(!a)return showLogin();let hash;
+try{ hash=await authHash(password); }catch(err){
+  const e=document.getElementById("loginError"); if(e)e.textContent="Login error. Please reload and try again."; return;
+}
+if(username!==a.username||hash!==a.hash){const e=document.getElementById("loginError");if(e)e.textContent="Incorrect username or password.";return}authUser=a;showApp()}
 function logoutAdmin(){if(!confirm("Logout from MithraQ?"))return;authUser=null;showLogin()}
 function authScreen(){const a=getAuth();if(!a)return `<div class="auth-screen"><div class="auth-card"><div class="brand-mark auth-logo">♛</div><h1>Welcome to MithraQ</h1><p class="auth-sub">Create your administrator account</p><div class="form"><input id="setupName" placeholder="Admin name"><input id="setupUser" placeholder="Admin username" autocomplete="username"><input id="setupPass" type="password" placeholder="Password (min 6 characters)" autocomplete="new-password"><input id="setupPass2" type="password" placeholder="Confirm password" autocomplete="new-password"><button class="btn gold full" onclick="setupAdmin()">Create Admin Account</button></div><div class="auth-note">This browser login protects the app on this device. For true multi-device security, connect a backend with Supabase Auth.</div></div></div>`;return `<div class="auth-screen"><div class="auth-card"><div class="brand-mark auth-logo">♛</div><h1>MithraQ</h1><p class="auth-sub">Admin Login</p><div class="form"><input id="loginUser" placeholder="Username" autocomplete="username"><input id="loginPass" type="password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')loginAdmin()"><button class="btn gold full" onclick="loginAdmin()">Login</button><div id="loginError" class="auth-error"></div></div><div class="auth-note">Your password is stored as a SHA-256 hash in this browser, not as plain text.</div></div></div>`}
 function showLogin(){document.querySelector('.app').classList.add('locked');document.body.classList.add('auth-mode');document.getElementById('authRoot').innerHTML=authScreen()}
@@ -140,6 +165,10 @@ window.addEventListener('load',()=>{authUser=getAuth();if(authUser)showApp();els
 document.getElementById('modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();});
 const _localSave=save; save=function(){_localSave(); if(supa) pushToSupabase();};
 document.querySelectorAll('.bottom-nav button[data-tab]').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;render();});
+document.querySelector('.bottom-nav')?.addEventListener('click',e=>{
+  const b=e.target.closest('button[data-tab]'); if(!b)return;
+  tab=b.dataset.tab; render();
+});
 render();
 
 /* ===== MithraQ Professional Phase 3 ===== */
@@ -351,4 +380,7 @@ function addonGroupReport(){const rows=addonGroupHealth();openModal('Group Busin
 function addonSettings(){const original=settingsPanel();const issues=addonDataCheck();return original+`<div class="card addon-tools"><h3 style="margin-top:0">📊 Business Tools</h3><div class="muted">Added without changing your existing data or screens.</div><div class="backup-grid"><button class="btn gold" onclick="addonExportFullCSV()">⬇️ Full Excel/CSV Data</button><button class="btn" onclick="addonExportJSON()">⬇️ Full JSON Backup</button></div><div class="addon-integrity"><b>Data Health:</b> <span class="badge ${issues.length?'pending':'active'}">${issues.length?issues.length+' ISSUE(S)':'OK'}</span>${issues.length?`<div class="muted addon-issues">${issues.slice(0,8).map(esc).join('<br>')}</div>`:'<div class="muted">No obvious broken member, payment or auction references found.</div>'}</div></div>`;}
 const _addonOriginalHome=home; home=addonHome();
 const _addonOriginalSettings=settingsPanel; settingsPanel=addonSettings;
-setTimeout(()=>{if(document.querySelector('.app')&&!document.querySelector('.app').classList.contains('locked'))render();},0);
+function goSettings(){try{closeMenuSheet();tab='settings';render();}catch(e){console.error('Settings error:',e);alert('Settings could not open. Please reload the app.');}}
+function bindNavigation(){document.querySelectorAll('.menu-sheet-grid button').forEach((b,i)=>{b.onclick=function(ev){ev.preventDefault();ev.stopPropagation();const tabs=['members','reports','search','settings'];if(tabs[i]){if(tabs[i]==='settings')goSettings();else{closeMenuSheet();tab=tabs[i];render();}}};});const sb=document.getElementById('navMenuBtn');if(sb)sb.onclick=function(ev){ev.preventDefault();ev.stopPropagation();openMenuSheet();};document.querySelectorAll('.bottom-nav button[data-tab]').forEach(b=>{b.onclick=function(ev){ev.preventDefault();tab=b.dataset.tab;closeMenuSheet();render();};});}
+const _render=render; render=function(){_render();setTimeout(bindNavigation,0);};
+setTimeout(()=>{if(document.querySelector('.app')&&!document.querySelector('.app').classList.contains('locked')){render();bindNavigation();}},0);
