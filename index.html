@@ -4,16 +4,23 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MithraQ — Together We Grow</title>
-  <link rel="stylesheet" href="style.css?v=20260911-professional12">
+  <link rel="stylesheet" href="style.css?v=20260911-professional13">
 </head>
 <body>
   <div class="app">
     <div id="authRoot"></div>
     <header class="topbar">
       <div class="brand-mark">♛</div>
-      <div>
+      <div class="topbar-title">
         <h1>MithraQ</h1>
         <p>Chit • Members • Auction • Dividend • Reports</p>
+      </div>
+      <div class="topbar-menu-wrap">
+        <button class="menu-btn" id="menuBtn" onclick="toggleMenu()" aria-label="Menu">☰</button>
+        <div class="menu-dropdown hidden" id="menuDropdown">
+          <button onclick="tab='reports';render();toggleMenu(true)">▤<span>Reports</span></button>
+          <button onclick="tab='settings';render();toggleMenu(true)">⚙<span>Settings</span></button>
+        </div>
       </div>
     </header>
     <main id="app" class="content"></main>
@@ -28,11 +35,10 @@
       <button data-tab="chits">▣<span>Chits</span></button>
       <button data-tab="members">♙<span>Members</span></button>
       <button data-tab="auction">♢<span>Auction</span></button>
-      <button data-tab="reports">▤<span>Reports</span></button>
       <button data-tab="collection">₹<span>Collection</span></button>
     </nav>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="script.js?v=20260911-professional12"></script>
+  <script src="script.js?v=20260911-professional13"></script>
 </body>
 </html>
