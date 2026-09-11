@@ -234,17 +234,19 @@ let auctionRoundValue=1;
 let auctionTimer=null, auctionSeconds=30;
 function defaultDueDate(){const d=new Date();d.setMonth(d.getMonth()+1);d.setDate(5);return d.toISOString().slice(0,10);}
 function formatDMY(iso){if(!iso)return '—';const parts=String(iso).split('-');if(parts.length!==3)return esc(iso);const [y,m,d]=parts;return `${d}.${m}.${y}`;}
-function auctionFinance(c,bid){
+function auctionFinance(c,bid,memberCount){
   const chitAmount=Number(c?.amount||0);
   const commissionPct=Number(c?.commission||0);
   const commissionAmt=chitAmount*commissionPct/100;
-  const discount=Math.max(0,Number(bid||0));
+  const discount=Math.max(0,chitAmount-Number(bid||0));
+  const prizeMoney=Math.max(0,chitAmount-discount);
   const dividendPool=Math.max(0,discount-commissionAmt);
-  const shareCount=Number(c?.duration||0)||membersForChit(c?.id).length||1;
+  const totalMembers=Number(memberCount||0)||membersForChit(c?.id).length||Number(c?.duration||0)||1;
+  const shareCount=Math.max(1,totalMembers-1);
   const dividendPerMember=dividendPool/shareCount;
   const monthly=Number(c?.monthly||(c?.duration?chitAmount/c.duration:0));
   const payable=Math.max(0,monthly-dividendPerMember);
-  return {chitAmount,commissionAmt,discount,dividendPool,dividendPerMember,shareCount,monthly,payable};
+  return {chitAmount,commissionAmt,discount,prizeMoney,dividendPool,dividendPerMember,shareCount,monthly,payable};
 }
 function auction(){
   if(!state.chits.length)return `<h2 class="page-title">Auction Room</h2><div class="subtitle">Group-wise live auction management</div><div class="empty big-empty"><b>No chit groups available</b><p>Create a chit before starting an auction.</p><button class="btn gold" onclick="newChit()">+ Create Chit</button></div>`;
