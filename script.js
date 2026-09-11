@@ -238,7 +238,7 @@ function auctionFinance(c,bid){
   const chitAmount=Number(c?.amount||0);
   const commissionPct=Number(c?.commission||0);
   const commissionAmt=chitAmount*commissionPct/100;
-  const discount=Math.max(0,chitAmount-Number(bid||0));
+  const discount=Math.max(0,Number(bid||0));
   const dividendPool=Math.max(0,discount-commissionAmt);
   const shareCount=Number(c?.duration||0)||membersForChit(c?.id).length||1;
   const dividendPerMember=dividendPool/shareCount;
