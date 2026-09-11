@@ -191,7 +191,7 @@ function clearCollectionFilters(){collectionSearchValue='';collectionStatusFilte
 
 function collection(){if(!state.chits.length)return `<h2 class="page-title">Collection</h2><div class="subtitle">Monthly member payments</div><div class="empty big-empty"><b>Create a chit group first</b><p>Then you can track paid, partial and pending monthly collections.</p><button class="btn gold" onclick="newChit()">+ Create Chit</button></div>`;const c=state.chits[0],month=collectionMonthValue;return `<div class="row"><div><h2 class="page-title">Collection</h2><div class="subtitle">Paid • Partial • Pending</div></div><input class="month-picker" id="collectionMonth" type="month" value="${month}" onchange="setCollectionMonth(this.value)"></div><div class="form collection-filter"><label class="field-label">Chit Group</label><select id="collectionChit" onchange="renderCollectionGroup()">${state.chits.map(x=>`<option value="${x.id}">${esc(x.name)} • ${x.type==='dividend'?'Dividend':'Fixed'}</option>`).join('')}</select></div><div class="collection-tools"><input id="collectionSearch" placeholder="Search member or phone..." value="${esc(collectionSearchValue)}" oninput="setCollectionSearch(this.value)"><select id="collectionStatus" onchange="setCollectionStatus(this.value)"><option value="all" ${collectionStatusFilter==='all'?'selected':''}>All Status</option><option value="paid" ${collectionStatusFilter==='paid'?'selected':''}>Paid</option><option value="partial" ${collectionStatusFilter==='partial'?'selected':''}>Partial</option><option value="pending" ${collectionStatusFilter==='pending'?'selected':''}>Pending</option></select><button class="btn" onclick="clearCollectionFilters()">Clear</button></div><div id="collectionGroup">${collectionGroup(c.id,month)}</div><div class="section"><h3>Payment History</h3><span class="muted">${state.payments.length} records</span></div><div class="list">${state.payments.length?state.payments.slice(0,30).map(p=>`<div class="card payment-row"><div style="flex:1"><b>${esc(p.member)}</b><div class="muted">${esc(p.chit)} • ${esc(p.month)} • ${esc(p.date)} • ${esc(p.mode)} • ${receiptNo(p)}</div></div><div style="text-align:right"><b>${money(p.amount)}</b><div><button class="mini-btn" onclick="editPayment('${String(p.id)}')">✎</button> <button class="mini-btn" onclick="printReceipt('${String(p.id)}')">🧾</button></div></div></div>`).join(''):'<div class="empty">No payment history yet.</div>'}</div>`;}
 function setCollectionMonth(value){collectionMonthValue=value||new Date().toISOString().slice(0,7);renderCollectionGroup();}
-function collectionGroup(id,month){const c=chitById(id),list=membersForChit(id);if(!c)return '';let paid=0,partial=0,pending=0,total=0,expected=0;list.forEach(m=>{const e=memberMonthly(m,c),p=paymentFor(m.id,month);expected+=e;if(!p)pending++;else if(Number(p.amount||0)>=e)paid++;else partial++;if(p)total+=Number(p.amount||0);});return `<div class="collection-stats"><div class="card"><span>Expected</span><b>${money(expected)}</b></div><div class="card"><span>Collected</span><b>${money(total)}</b></div><div class="card"><span>Balance</span><b>${money(Math.max(0,expected-total))}</b></div></div><div class="collection-summary"><span class="badge active">${paid} PAID</span><span class="badge partial">${partial} PARTIAL</span><span class="badge pending">${pending} PENDING</span></div><div class="payment-list"><div class="section"><h3>Members</h3><span class="muted">${list.length} of ${allList.length} members</span></div>${list.length?list.map(m=>{const p=paymentFor(m.id,month),e=memberMonthly(m,c),st=paymentStatus(p,e),label=st==='paid'?'PAID':st==='partial'?'PARTIAL':'PENDING';return `<div class="card payment-member"><div class="avatar">${esc((m.name||'?')[0]).toUpperCase()}</div><div style="flex:1"><b>${esc(m.name)}</b><div class="muted">Expected ${money(e)} ${p?'• Paid '+money(p.amount):''}</div></div><span class="badge ${st==='paid'?'active':st==='partial'?'partial':'pending'}">${label}</span><button class="action-btn ${p?'edit':'collect'}" onclick="collectMember('${String(m.id)}','${String(id)}')">${p?'Edit':'Collect'}</button>${!p?`<button class="mini-btn" onclick="whatsappPaymentReminder('${String(m.id)}','${String(id)}')">💬</button>`:''}</div>`}).join(''):'<div class="empty">No members in this group.</div>'}</div>`;}
+function collectionGroup(id,month){const c=chitById(id),list=membersForChit(id);if(!c)return '';let paid=0,partial=0,pending=0,total=0,expected=0;list.forEach(m=>{const e=memberMonthly(m,c),p=paymentFor(m.id,month);expected+=e;if(!p)pending++;else if(Number(p.amount||0)>=e)paid++;else partial++;if(p)total+=Number(p.amount||0);});return `<div class="collection-stats"><div class="card"><span>Expected</span><b>${money(expected)}</b></div><div class="card"><span>Collected</span><b>${money(total)}</b></div><div class="card"><span>Balance</span><b>${money(Math.max(0,expected-total))}</b></div></div><div class="collection-summary"><span class="badge active">${paid} PAID</span><span class="badge partial">${partial} PARTIAL</span><span class="badge pending">${pending} PENDING</span></div><div class="payment-list"><div class="section"><h3>Members</h3><span class="muted">${list.length} members</span></div>${list.length?list.map(m=>{const p=paymentFor(m.id,month),e=memberMonthly(m,c),st=paymentStatus(p,e),label=st==='paid'?'PAID':st==='partial'?'PARTIAL':'PENDING';return `<div class="card payment-member"><div class="avatar">${esc((m.name||'?')[0]).toUpperCase()}</div><div style="flex:1"><b>${esc(m.name)}</b><div class="muted">Expected ${money(e)} ${p?'• Paid '+money(p.amount):''}</div></div><span class="badge ${st==='paid'?'active':st==='partial'?'partial':'pending'}">${label}</span><button class="action-btn ${p?'edit':'collect'}" onclick="collectMember('${String(m.id)}','${String(id)}')">${p?'Edit':'Collect'}</button>${!p?`<button class="mini-btn" onclick="whatsappPaymentReminder('${String(m.id)}','${String(id)}')">💬</button>`:''}</div>`}).join(''):'<div class="empty">No members in this group.</div>'}</div>`;}
 function renderCollectionGroup(){const id=document.getElementById('collectionChit').value;document.getElementById('collectionGroup').innerHTML=collectionGroup(id,collectionMonthValue);}
 function openModal(title,body){document.getElementById('modalTitle').textContent=title;document.getElementById('modalBody').innerHTML=body;document.getElementById('modal').classList.remove('hidden');}
 function closeModal(){document.getElementById('modal').classList.add('hidden');}
@@ -774,9 +774,39 @@ window.addEventListener('load',()=>{try{const s=JSON.parse(sessionStorage.getIte
   window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;hideInstall();localStorage.removeItem('mithraq_install_dismissed');});
   window.addEventListener('load',()=>{
     updateNetwork();
-    if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').catch(()=>{});}
+    if('serviceWorker' in navigator){
+      navigator.serviceWorker.register('./sw.js?v=blankfix-v2').then(reg=>{
+        if(reg.waiting) reg.waiting.postMessage({type:'SKIP_WAITING'});
+      }).catch(()=>{});
+    }
     const btn=document.getElementById('installBtn'),close=document.getElementById('installClose');
     if(btn)btn.addEventListener('click',async()=>{if(!deferredInstallPrompt){showInstall();return;}deferredInstallPrompt.prompt();await deferredInstallPrompt.userChoice;deferredInstallPrompt=null;hideInstall();});
     if(close)close.addEventListener('click',()=>{localStorage.setItem('mithraq_install_dismissed','1');hideInstall();});
+  });
+})();
+
+
+/* ===== Phase 16.1: Blank-screen protection ===== */
+(function(){
+  const finalRender=render;
+  render=function(){
+    const app=document.getElementById('app');
+    try{
+      return finalRender();
+    }catch(error){
+      console.error('MithraQ render error:',error);
+      if(app){
+        app.innerHTML=`<div class="render-recovery card"><h2 class="page-title">Welcome to MithraQ</h2><div class="subtitle">The dashboard was recovered safely.</div><div class="hero"><small>SMART CHIT MANAGEMENT</small><h2>${typeof money==='function'?money(0):'₹0'}</h2><div class="hero-muted">Your app data is still stored on this device.</div></div><div class="grid"><div class="card"><div class="stat-label">CHITS</div><div class="stat-value">${state?.chits?.length||0}</div></div><div class="card"><div class="stat-label">MEMBERS</div><div class="stat-value">${state?.members?.length||0}</div></div></div><button class="btn gold full" onclick="location.reload()">Reload App</button></div>`;
+      }
+      return null;
+    }
+  };
+
+  // Render once after the complete script has finished loading.
+  // This prevents an empty <main> when an earlier PWA/auth callback fires first.
+  window.addEventListener('DOMContentLoaded',()=>{
+    if(authUser && document.getElementById('authRoot')?.innerHTML===''){
+      try{render();}catch(e){}
+    }
   });
 })();
