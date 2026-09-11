@@ -370,3 +370,19 @@ body{
  .bottom-nav button.active:after{display:none!important}
  .grid{grid-template-columns:repeat(4,1fr)!important}
 }
+
+/* FORCE GREEN NATURE THEME */
+body{background:linear-gradient(135deg,#f5fbf4,#e5f3e7)!important}
+.app{background:linear-gradient(180deg,#ffffff,#f2faf2)!important}
+.topbar{background:linear-gradient(135deg,#ffffff,#edf8ef)!important}
+.topbar h1,.page-title,.section h3,.chit-title{color:#07543b!important}
+.topbar p,.subtitle,.muted{color:#6f877b!important}
+.hero{background:linear-gradient(135deg,#08754d,#18a064)!important;border-color:#a9d4b7!important}
+.card{background:#ffffff!important;border-color:#d4e8d9!important}
+.stat-value{color:#07543b!important}
+.quick{background:linear-gradient(145deg,#ffffff,#f0f9f1)!important;color:#07543b!important}
+.quick b{color:#0a925a!important}
+.bottom-nav{background:rgba(255,255,255,.98)!important;border-top-color:#cfe5d4!important}
+.bottom-nav button.active{color:#08764d!important;background:#e9f7ec!important}
+.bottom-nav button.active:after{background:#c99a32!important}
+.btn.gold{background:linear-gradient(135deg,#e8c766,#bd8c29)!important}
