@@ -760,8 +760,8 @@ function changeAdminPin(){
 }
 async function saveAdminPin(){const o=document.getElementById('oldPin')?.value||'',n=document.getElementById('newPin')?.value||'',n2=document.getElementById('newPin2')?.value||'',e=document.getElementById('changePinErr'),s=getPin();if(!s||await pinHash(o)!==s.hash){e.textContent='Current PIN is incorrect.';return}if(!/^\d{4,6}$/.test(n)){e.textContent='New PIN must contain 4 to 6 digits.';return}if(n!==n2){e.textContent='New PINs do not match.';return}localStorage.setItem(PIN_KEY,JSON.stringify({hash:await pinHash(n),updatedAt:new Date().toISOString()}));closeModal();uiAlert('Admin PIN changed successfully.','Security');}
 function securitySettingsCard(){return `<div class="card security-card"><div><h3>🔐 App Security</h3><div class="muted">PIN lock • Auto-lock after ${LOCK_MINUTES} minutes</div></div><div class="security-actions"><button class="btn" onclick="changeAdminPin()">Change PIN</button><button class="btn gold" onclick="lockApp()">Lock Now</button></div></div>`}
-const _oldRenderSettings=typeof settings==='function'?settings:null;
-function settings(){let base=_oldRenderSettings?_oldRenderSettings():'<h2 class="page-title">Settings</h2>';return base+securitySettingsCard()}
+const _oldRenderSettings=settingsPanel;
+settingsPanel=function(){return _oldRenderSettings()+securitySettingsCard()};
 const _oldShowApp=showApp;
 showApp=function(){document.querySelector('.app').classList.remove('locked');document.body.classList.remove('auth-mode');document.getElementById('authRoot').innerHTML='';const p=getPin();if(!p){pinUnlocked=false;pinScreen('setup');return}pinUnlocked=false;pinScreen('lock')}
 const _oldShowLogin=showLogin;
