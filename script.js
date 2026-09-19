@@ -253,6 +253,8 @@ function render(){
   document.querySelectorAll('.bottom-nav button[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
   const nb=document.getElementById('notifyBadge');
   if(nb){const n=typeof unreadNotificationCount==='function'?unreadNotificationCount():0;nb.textContent=n>99?'99+':String(n);nb.style.display=n?'block':'none';}
+  const mnb=document.getElementById('menuNotifyBadge');
+  if(mnb){const n=typeof unreadNotificationCount==='function'?unreadNotificationCount():0;mnb.textContent=n>99?'99+':(n?String(n):'');}
   const navMenuBtn=document.getElementById('navMenuBtn');
   if(navMenuBtn && typeof MENU_TABS!=='undefined')navMenuBtn.classList.toggle('active',MENU_TABS.includes(tab));
 }
@@ -792,11 +794,14 @@ setTimeout(()=>{if(document.querySelector('.app')&&!document.querySelector('.app
     info:'<circle cx="12" cy="12" r="9"/><path d="M12 10v6M12 7h.01"/>',
     warning:'<path d="m12 4 9 16H3L12 4Z"/><path d="M12 9v5M12 17h.01"/>',
     star:'<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9z"/>',
-    close:'<path d="m6 6 12 12M18 6 6 18"/>'
+    close:'<path d="m6 6 12 12M18 6 6 18"/>',
+    bell:'<path d="M6 16V11a6 6 0 0 1 12 0v5l1.6 2.4H4.4L6 16Z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
+    list:'<path d="M8 6h13M8 12h13M8 18h13"/><path d="M3.5 6h.01M3.5 12h.01M3.5 18h.01"/>',
+    cash:'<rect x="2.2" y="6.2" width="19.6" height="11.6" rx="2.2"/><circle cx="12" cy="12" r="2.3"/><path d="M5.5 12h.01M18.5 12h.01"/>'
   };
   const map={
     '⌂':'home','▣':'grid','♢':'auction','₹':'rupee','☰':'menu','♙':'user','▤':'report','⌕':'search','⚙':'settings','◷':'history',
-    '✎':'edit','⌫':'trash','+':'plus','→':'arrow','⬇️':'down','⬆️':'up','⬇':'down','⬆':'up','🔒':'lock','💬':'message','🖨️':'printer','🖨':'printer','🧾':'receipt','📋':'clipboard','✓':'check','📊':'chart','☁️':'cloud','☁':'cloud','⚠️':'warning','⚠':'warning','×':'close','!':'info','♛':'star'
+    '✎':'edit','⌫':'trash','+':'plus','→':'arrow','⬇️':'down','⬆️':'up','⬇':'down','⬆':'up','🔒':'lock','💬':'message','🖨️':'printer','🖨':'printer','🧾':'receipt','📋':'clipboard','✓':'check','📊':'chart','☁️':'cloud','☁':'cloud','⚠️':'warning','⚠':'warning','×':'close','!':'info','♛':'star','🔔':'bell','☷':'list','💸':'cash'
   };
   function svg(name){return '<svg class="mq-svg" viewBox="0 0 24 24" aria-hidden="true">'+(ICONS[name]||ICONS.info)+'</svg>';}
   function replaceTextNode(node){
