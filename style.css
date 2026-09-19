@@ -443,3 +443,60 @@ body::before{
   background-size:auto,auto,auto,360px 320px;
   background-repeat:repeat;
 }
+
+
+/* ===== MithraQ Money Rain — Sample 1 =====
+   Decorative only: subtle floating rupee/coin particles behind the UI. */
+.money-rain{
+  position:absolute;
+  inset:0;
+  z-index:0;
+  overflow:hidden;
+  pointer-events:none;
+  opacity:.48;
+  -webkit-mask-image:linear-gradient(to bottom,transparent 0%,#000 8%,#000 88%,transparent 100%);
+  mask-image:linear-gradient(to bottom,transparent 0%,#000 8%,#000 88%,transparent 100%);
+}
+.money-rain .money-particle{
+  position:absolute;
+  top:-48px;
+  left:var(--x);
+  width:var(--size);
+  height:var(--size);
+  display:grid;
+  place-items:center;
+  color:var(--particle-color,#b68a1a);
+  font-size:calc(var(--size) * .58);
+  font-weight:900;
+  line-height:1;
+  opacity:var(--opacity,.2);
+  filter:drop-shadow(0 3px 5px rgba(3,74,55,.08));
+  transform:rotate(var(--rotate));
+  animation:moneyFall var(--duration) linear var(--delay) infinite;
+}
+.money-rain .money-particle.coin{
+  border:1px solid currentColor;
+  border-radius:50%;
+  background:rgba(255,248,215,.18);
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.16);
+}
+.money-rain .money-particle.note{
+  width:calc(var(--size) * 1.55);
+  height:calc(var(--size) * .88);
+  border:1px solid currentColor;
+  border-radius:5px;
+  background:rgba(214,162,31,.045);
+  font-size:calc(var(--size) * .5);
+}
+@keyframes moneyFall{
+  0%{transform:translate3d(0,-55px,0) rotate(var(--rotate))}
+  25%{transform:translate3d(var(--drift),25vh,0) rotate(calc(var(--rotate) + 70deg))}
+  50%{transform:translate3d(calc(var(--drift) * -0.55),52vh,0) rotate(calc(var(--rotate) + 150deg))}
+  75%{transform:translate3d(var(--drift),76vh,0) rotate(calc(var(--rotate) + 225deg))}
+  100%{transform:translate3d(calc(var(--drift) * -0.35),112vh,0) rotate(calc(var(--rotate) + 320deg))}
+}
+html[data-theme="dark"] .money-rain{opacity:.32}
+@media(max-width:430px){.money-rain{opacity:.34}.money-rain .money-particle{filter:none}}
+@media(prefers-reduced-motion:reduce){.money-rain{display:none}}
+/* Keep all interactive content above the decorative layer. */
+.topbar,.content,.bottom-nav,.modal,.menu-sheet,.notice-layer,.pin-screen{position:relative;z-index:2}
