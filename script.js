@@ -734,7 +734,7 @@ function securitySettingsCard(){return `<div class="card security-card"><div><h3
 const _oldRenderSettings=typeof settings==='function'?settings:null;
 function settings(){let base=_oldRenderSettings?_oldRenderSettings():'<h2 class="page-title">Settings</h2>';return base+securitySettingsCard()}
 const _oldShowApp=showApp;
-showApp=function(){document.querySelector('.app').classList.remove('locked');document.body.classList.remove('auth-mode');document.getElementById('authRoot').innerHTML='';const p=getPin();if(!p){pinUnlocked=false;pinScreen('setup');return}pinUnlocked=false;pinScreen('lock')}
+showApp=function(){document.querySelector('.app').classList.remove('locked');document.body.classList.remove('auth-mode');document.getElementById('authRoot').innerHTML='';pinUnlocked=true;_oldRender();const p=getPin();pinUnlocked=false;if(!p){pinScreen('setup');return}pinScreen('lock')}
 const _oldShowLogin=showLogin;
 showLogin=function(){authUser=null;pinUnlocked=false;clearTimeout(lockTimer);const pr=document.getElementById('pinRoot');if(pr)pr.remove();_oldShowLogin()}
 const _oldRender=render;
