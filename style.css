@@ -767,3 +767,52 @@ input::placeholder,textarea::placeholder{font-weight:600;opacity:.8}
 .empty-icon{background:linear-gradient(145deg,#ffe58a,#ffc75c);border-color:#e8b03a}
 .auth-logo{box-shadow:0 10px 24px rgba(217,154,11,.35)}
 .avatar{background:linear-gradient(145deg,#c8f0de,#ffe9a8)}
+
+
+/* =====================================================================
+   MithraQ — Colourful Menu sheet (additive only)
+   Only colours are added; sizes, layout, labels and actions are untouched.
+   ===================================================================== */
+.menu-sheet-card{
+  background-image:
+    radial-gradient(circle at 8% 0%,rgba(47,127,214,.20),transparent 38%),
+    radial-gradient(circle at 92% 0%,rgba(226,154,11,.22),transparent 38%),
+    radial-gradient(circle at 50% 100%,rgba(15,157,148,.16),transparent 46%),
+    radial-gradient(circle at 96% 96%,rgba(113,81,214,.16),transparent 40%);
+  border-top:3px solid #e29a0b;
+  box-shadow:0 -20px 50px rgba(2,65,48,.25),0 -3px 0 rgba(47,127,214,.35);
+}
+.menu-sheet-handle{background:linear-gradient(90deg,#2f6fd6,#0a8f68,#e29a0b,#e8621c,#7151d6)}
+
+.menu-sheet-icon.mi-blue{background:linear-gradient(150deg,#5aa2ff,#2f6fd6);color:#fff;border:1px solid rgba(255,255,255,.55);box-shadow:0 10px 20px rgba(47,111,214,.42),inset 0 1px 0 rgba(255,255,255,.55)}
+.menu-sheet-grid button:has(.mi-blue) > span:last-child{color:#2f6fd6}
+
+.menu-sheet-icon.mi-green{background:linear-gradient(150deg,#3ed598,#0a8f68);color:#fff;border:1px solid rgba(255,255,255,.55);box-shadow:0 10px 20px rgba(10,143,104,.42),inset 0 1px 0 rgba(255,255,255,.55)}
+.menu-sheet-grid button:has(.mi-green) > span:last-child{color:#0a8f68}
+
+.menu-sheet-icon.mi-gold{background:linear-gradient(150deg,#ffd25a,#e29a0b);color:#fff;border:1px solid rgba(255,255,255,.55);box-shadow:0 10px 20px rgba(226,154,11,.42),inset 0 1px 0 rgba(255,255,255,.55)}
+.menu-sheet-grid button:has(.mi-gold) > span:last-child{color:#e29a0b}
+
+.menu-sheet-icon.mi-grey{background:linear-gradient(150deg,#8fa3b8,#586b82);color:#fff;border:1px solid rgba(255,255,255,.55);box-shadow:0 10px 20px rgba(88,107,130,.42),inset 0 1px 0 rgba(255,255,255,.55)}
+.menu-sheet-grid button:has(.mi-grey) > span:last-child{color:#586b82}
+
+.menu-sheet-icon.mi-history{background:linear-gradient(150deg,#a98bff,#7151d6);color:#fff;border:1px solid rgba(255,255,255,.55);box-shadow:0 10px 20px rgba(113,81,214,.42),inset 0 1px 0 rgba(255,255,255,.55)}
+.menu-sheet-grid button:has(.mi-history) > span:last-child{color:#7151d6}
+
+.menu-sheet-icon.mi-teal{background:linear-gradient(150deg,#3fd8c9,#0f9d94);color:#fff;border:1px solid rgba(255,255,255,.55);box-shadow:0 10px 20px rgba(15,157,148,.42),inset 0 1px 0 rgba(255,255,255,.55)}
+.menu-sheet-grid button:has(.mi-teal) > span:last-child{color:#0f9d94}
+
+.menu-sheet-icon.mi-indigo{background:linear-gradient(150deg,#8b86ff,#5b4fd6);color:#fff;border:1px solid rgba(255,255,255,.55);box-shadow:0 10px 20px rgba(91,79,214,.42),inset 0 1px 0 rgba(255,255,255,.55)}
+.menu-sheet-grid button:has(.mi-indigo) > span:last-child{color:#5b4fd6}
+
+.menu-sheet-icon.mi-cyan{background:linear-gradient(150deg,#4cc9f0,#0a90ab);color:#fff;border:1px solid rgba(255,255,255,.55);box-shadow:0 10px 20px rgba(10,144,171,.42),inset 0 1px 0 rgba(255,255,255,.55)}
+.menu-sheet-grid button:has(.mi-cyan) > span:last-child{color:#0a90ab}
+
+.menu-sheet-icon.mi-orange{background:linear-gradient(150deg,#ffa45c,#e8621c);color:#fff;border:1px solid rgba(255,255,255,.55);box-shadow:0 10px 20px rgba(232,98,28,.42),inset 0 1px 0 rgba(255,255,255,.55)}
+.menu-sheet-grid button:has(.mi-orange) > span:last-child{color:#e8621c}
+
+.menu-sheet-icon.mi-mint{background:linear-gradient(150deg,#5fe0a8,#0a7a4c);color:#fff;border:1px solid rgba(255,255,255,.55);box-shadow:0 10px 20px rgba(10,122,76,.42),inset 0 1px 0 rgba(255,255,255,.55)}
+.menu-sheet-grid button:has(.mi-mint) > span:last-child{color:#0a7a4c}
+
+.menu-sheet-grid button:active .menu-sheet-icon{transform:scale(.94)}
+.menu-sheet-badge{background:linear-gradient(135deg,#ff6b5a,#d9304a);box-shadow:0 0 0 2px #fff,0 4px 8px rgba(217,48,74,.4)}
