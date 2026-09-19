@@ -130,7 +130,36 @@ function whatsappCenter(){
 }
 function renderWhatsAppRows(){const box=document.getElementById('waRows');if(!box)return;const q=(document.getElementById('waSearch')?.value||'').trim().toLowerCase();const members=Array.isArray(state.members)?state.members:[],payments=Array.isArray(state.payments)?state.payments:[];box.innerHTML=members.filter(m=>!q||[m.name,m.phone,m.memberNo].join(' ').toLowerCase().includes(q)).map(m=>{const paid=payments.filter(p=>String(p.memberId)===String(m.id)).reduce((a,p)=>a+Number(p.amount||0),0);return `<div class="card" style="margin:10px 0;padding:14px"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><div><b>${esc(m.name||'Member')}</b><div class="subtitle">#${esc(m.memberNo||'—')} • ${esc(m.phone||'No phone')}</div><div class="subtitle">Recorded payments: ₹${paid.toLocaleString('en-IN')}</div></div><button class="btn primary" onclick="sendWA(${JSON.stringify(String(m.phone||''))},${JSON.stringify(String(m.name||'Member'))},${paid})">WhatsApp</button></div></div>`}).join('')||'<div class="empty-state">No members found</div>';}
 function sendWA(phone,name,paid){const digits=String(phone||'').replace(/\D/g,'');if(!digits){alert('Member phone number is missing.');return;}const msg=`Hello ${name}, this is a MithraQ collection reminder. Recorded payment total: ₹${Number(paid||0).toLocaleString('en-IN')}. Please contact us for the current pending amount. Thank you.`;const url=`https://wa.me/${digits.startsWith('91')?digits:'91'+digits}?text=${encodeURIComponent(msg)}`;window.open(url,'_blank');}
-function render(){const app=document.getElementById("app"); if(tab==='home')app.innerHTML=home(); if(tab==='chits')app.innerHTML=chits(); if(tab==='members')app.innerHTML=members(); if(tab==='auction')app.innerHTML=auction(); if(tab==='reports')app.innerHTML=reports(); if(tab==='collection')app.innerHTML=collection(); if(tab==='search')app.innerHTML=searchPage(); if(tab==='history')app.innerHTML=historyPage(); if(tab==='settings')app.innerHTML='<h2 class="page-title">Settings</h2><div class="subtitle">Security, backup and device controls</div>'+settingsPanel(); if(tab==='reminders')app.innerHTML=reminderCenter(); if(tab==='notifications')app.innerHTML=notificationCenter(); if(tab==='activity')app.innerHTML=activityLogPage(); if(tab==='whatsapp')app.innerHTML=whatsappCenter(); document.querySelectorAll('.bottom-nav button[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab)); const nb=document.getElementById('notifyBadge'); if(nb){const n=unreadNotificationCount(); nb.textContent=n>99?'99+':String(n); nb.style.display=n?'block':'none';} const navMenuBtn=document.getElementById('navMenuBtn'); if(navMenuBtn)navMenuBtn.classList.toggle('active',MENU_TABS.includes(tab));}
+function render(){
+  const app=document.getElementById("app");
+  if(!app)return;
+  try{
+    let html="";
+    if(tab==='home')html=home();
+    else if(tab==='chits')html=chits();
+    else if(tab==='members')html=members();
+    else if(tab==='auction')html=auction();
+    else if(tab==='reports')html=reports();
+    else if(tab==='collection')html=collection();
+    else if(tab==='search')html=searchPage();
+    else if(tab==='history')html=historyPage();
+    else if(tab==='settings')html='<h2 class="page-title">Settings</h2><div class="subtitle">Security, backup and device controls</div>'+settingsPanel();
+    else if(tab==='reminders')html=reminderCenter();
+    else if(tab==='notifications')html=notificationCenter();
+    else if(tab==='activity')html=activityLogPage();
+    else if(tab==='whatsapp')html=whatsappCenter();
+    if(typeof html!=='string' || !html.trim()) throw new Error('Empty page output');
+    app.innerHTML=html;
+  }catch(err){
+    console.error('MithraQ render error:',err);
+    app.innerHTML=`<div class="page-title">MithraQ Dashboard</div><div class="subtitle">Your data is safe. The page renderer recovered from an error.</div><div class="grid dashboard-kpis"><div class="card"><div class="stat-label">MEMBERS</div><div class="stat-value">${Array.isArray(state.members)?state.members.length:0}</div></div><div class="card"><div class="stat-label">CHITS</div><div class="stat-value">${Array.isArray(state.chits)?state.chits.length:0}</div></div><div class="card"><div class="stat-label">PAYMENTS</div><div class="stat-value">${Array.isArray(state.payments)?state.payments.length:0}</div></div><div class="card"><div class="stat-label">AUCTIONS</div><div class="stat-value">${Array.isArray(state.auctions)?state.auctions.length:0}</div></div></div><div class="card"><h3>Quick Actions</h3><div class="dashboard-actions"><button class="dash-action" onclick="tab='collection';render()">₹<span>Payment</span></button><button class="dash-action" onclick="tab='members';render()">♙<span>Member</span></button><button class="dash-action" onclick="tab='auction';render()">♢<span>Auction</span></button><button class="dash-action" onclick="tab='chits';render()">▣<span>Chit</span></button></div></div>`;
+  }
+  document.querySelectorAll('.bottom-nav button[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
+  const nb=document.getElementById('notifyBadge');
+  if(nb){const n=typeof unreadNotificationCount==='function'?unreadNotificationCount():0;nb.textContent=n>99?'99+':String(n);nb.style.display=n?'block':'none';}
+  const navMenuBtn=document.getElementById('navMenuBtn');
+  if(navMenuBtn && typeof MENU_TABS!=='undefined')navMenuBtn.classList.toggle('active',MENU_TABS.includes(tab));
+}
 function openMenuSheet(){const s=document.getElementById('menuSheet'); if(s)s.classList.remove('hidden');}
 function closeMenuSheet(){const s=document.getElementById('menuSheet'); if(s)s.classList.add('hidden');}
 function chits(){return `<div class="row"><div><h2 class="page-title">Chits</h2><div class="subtitle">Create groups first, then add members to a selected group.</div></div><button class="btn gold" onclick="newChit()">+ New Chit</button></div><div class="list">${state.chits.length?state.chits.map(c=>{const n=membersForChit(c.id).length;return `<div class="card chit-card"><div class="chit-card-head"><div><div class="chit-title">${esc(c.name)}</div><div class="muted">${money(c.amount)} · ${c.duration||0} months · ${c.type==='dividend'?'Dividend':'Fixed'}</div></div><div class="chit-card-tools"><button class="icon-action edit" type="button" title="Edit Chit" aria-label="Edit Chit" onclick="editChit('${String(c.id)}')">✎</button><button class="icon-action delete" type="button" title="Delete Chit" aria-label="Delete Chit" onclick="deleteChit('${String(c.id)}')">⌫</button></div></div><div class="chit-card-meta"><span class="badge active">${n} MEMBERS</span></div><div class="progress"><i style="width:${Math.min(100,(c.current||0)/(c.duration||1)*100)}%"></i></div><div class="muted">Monthly ${money(c.monthly||0)} · ${c.current||0}/${c.duration||0} months</div><button class="small-link" onclick="openGroupMembers('${c.id}')">View ${n} group members →</button></div>`}).join(''):'<div class="empty">No chits yet.<br><br><button class="btn gold" onclick="newChit()">Create your first chit</button></div>'}</div>`;}
@@ -734,7 +763,7 @@ function securitySettingsCard(){return `<div class="card security-card"><div><h3
 const _oldRenderSettings=typeof settings==='function'?settings:null;
 function settings(){let base=_oldRenderSettings?_oldRenderSettings():'<h2 class="page-title">Settings</h2>';return base+securitySettingsCard()}
 const _oldShowApp=showApp;
-showApp=function(){document.querySelector('.app').classList.remove('locked');document.body.classList.remove('auth-mode');document.getElementById('authRoot').innerHTML='';pinUnlocked=true;_oldRender();const p=getPin();pinUnlocked=false;if(!p){pinScreen('setup');return}pinScreen('lock')}
+showApp=function(){document.querySelector('.app').classList.remove('locked');document.body.classList.remove('auth-mode');document.getElementById('authRoot').innerHTML='';const p=getPin();if(!p){pinUnlocked=false;pinScreen('setup');return}pinUnlocked=false;pinScreen('lock')}
 const _oldShowLogin=showLogin;
 showLogin=function(){authUser=null;pinUnlocked=false;clearTimeout(lockTimer);const pr=document.getElementById('pinRoot');if(pr)pr.remove();_oldShowLogin()}
 const _oldRender=render;
