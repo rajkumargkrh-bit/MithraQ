@@ -802,6 +802,7 @@ setTimeout(()=>{if(document.querySelector('.app')&&!document.querySelector('.app
     for(const k of Object.keys(map)){if(trimmed===k||trimmed.startsWith(k+' ')){token=k;name=map[k];rest=trimmed.slice(k.length).replace(/^\s+/,'');break;}}
     if(!name)return;
     const span=document.createElement('span'); span.className='mq-icon-wrap'; span.innerHTML=svg(name)+(rest?' <span>'+rest+'</span>':'');
+    if(!node.parentNode)return; /* node was already removed by a re-render */
     node.parentNode.replaceChild(span,node);
   }
   function scan(root){
@@ -1415,3 +1416,28 @@ function exportPayoutsCSV(){
   });
   downloadCSV(rows,'mithraq-prize-payouts.csv');
 }
+
+
+/* ===== MithraQ Money Rain ===== */
+(function initMoneyRain(){
+  const root=document.getElementById('moneyRain');
+  if(!root || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const symbols=['₹','₹','◉','₹','◌','₹','▣'];
+  const count=window.innerWidth<500?12:18;
+  const rand=(min,max)=>Math.random()*(max-min)+min;
+  for(let i=0;i<count;i++){
+    const el=document.createElement('span');
+    const note=Math.random()<0.18;
+    el.className='money-particle '+(note?'note':'coin');
+    el.textContent=note?'₹':symbols[Math.floor(Math.random()*symbols.length)];
+    el.style.setProperty('--x',rand(2,96)+'%');
+    el.style.setProperty('--size',Math.round(rand(15,29))+'px');
+    el.style.setProperty('--duration',rand(12,24).toFixed(1)+'s');
+    el.style.setProperty('--delay',(-rand(0,24)).toFixed(1)+'s');
+    el.style.setProperty('--drift',Math.round(rand(-42,42))+'px');
+    el.style.setProperty('--rotate',Math.round(rand(-28,28))+'deg');
+    el.style.setProperty('--opacity',rand(.10,.24).toFixed(2));
+    el.style.setProperty('--particle-color',Math.random()<.52?'#b68a1a':'#16795e');
+    root.appendChild(el);
+  }
+})();
