@@ -100,6 +100,11 @@ function refreshSmartNotifications(){
   if(active.length) addNotification('Auction active',`${active.length} auction(s) are currently active.`,'auction','auction-active');
   const badPhones=invalidPhoneMembers();
   if(badPhones.length) addNotification('Invalid phone numbers',`${badPhones.length} member(s) have an invalid saved phone number and can't be reached on WhatsApp.`,'warning','bad-phone-'+badPhones.map(m=>m.id).sort().join(','));
+  state.chits.forEach(c=>{
+    const n=auctionDaysLeft(c.nextAuctionDate); if(n===null||c.status==='completed')return;
+    if(n>=0&&n<=3) addNotification(n===0?'Auction today':'Auction reminder',`${c.name} auction ${n===0?'is today':n===1?'is tomorrow':'is in '+n+' days'} (${auctionDateText(c)}).`,'auction','auc-'+c.id+'-'+c.nextAuctionDate+'-'+n);
+    else if(n<0&&n>=-7) addNotification('Auction date passed',`${c.name} auction date (${formatDMY(c.nextAuctionDate)}) has passed. Please update the next auction date.`,'warning','auc-passed-'+c.id+'-'+c.nextAuctionDate);
+  });
 }
 function notificationCenter(){
   refreshSmartNotifications();
@@ -247,7 +252,7 @@ function render(){
 }
 function openMenuSheet(){const s=document.getElementById('menuSheet'); if(s)s.classList.remove('hidden');}
 function closeMenuSheet(){const s=document.getElementById('menuSheet'); if(s)s.classList.add('hidden');}
-function chits(){return `<div class="row"><div><h2 class="page-title">Chits</h2><div class="subtitle">Create groups first, then add members to a selected group.</div></div><button class="btn gold" onclick="newChit()">+ New Chit</button></div><div class="list">${state.chits.length?state.chits.map(c=>{const n=membersForChit(c.id).length,closed=c.status==='completed';return `<div class="card chit-card"><div class="chit-card-head"><div><div class="chit-title">${esc(c.name)}</div><div class="muted">${money(c.amount)} · ${c.duration||0} months · ${c.type==='dividend'?'Dividend':'Fixed'}</div></div><div class="chit-card-tools"><button class="icon-action edit" type="button" title="Edit Chit" aria-label="Edit Chit" onclick="editChit('${String(c.id)}')">✎</button><button class="icon-action delete" type="button" title="Delete Chit" aria-label="Delete Chit" onclick="deleteChit('${String(c.id)}')">⌫</button></div></div><div class="chit-card-meta"><span class="badge active">${n} MEMBERS</span>${closed?'<span class="badge pending">CLOSED</span>':''}</div><div class="progress"><i style="width:${Math.min(100,(c.current||0)/(c.duration||1)*100)}%"></i></div><div class="muted">Monthly ${money(c.monthly||0)} · ${c.current||0}/${c.duration||0} months</div><div class="row" style="margin-top:8px"><button class="small-link" onclick="openGroupMembers('${c.id}')">View ${n} group members →</button><button class="small-link" onclick="openClosureReport('${c.id}')">📑 Settlement →</button></div></div>`}).join(''):'<div class="empty">No chits yet.<br><br><button class="btn gold" onclick="newChit()">Create your first chit</button></div>'}</div>`;}
+function chits(){return `<div class="row"><div><h2 class="page-title">Chits</h2><div class="subtitle">Create groups first, then add members to a selected group.</div></div><button class="btn gold" onclick="newChit()">+ New Chit</button></div><div class="list">${state.chits.length?state.chits.map(c=>{const n=membersForChit(c.id).length,closed=c.status==='completed';return `<div class="card chit-card"><div class="chit-card-head"><div><div class="chit-title">${esc(c.name)}</div><div class="muted">${money(c.amount)} · ${c.duration||0} months · ${c.type==='dividend'?'Dividend':'Fixed'}</div></div><div class="chit-card-tools"><button class="icon-action edit" type="button" title="Edit Chit" aria-label="Edit Chit" onclick="editChit('${String(c.id)}')">✎</button><button class="icon-action delete" type="button" title="Delete Chit" aria-label="Delete Chit" onclick="deleteChit('${String(c.id)}')">⌫</button></div></div><div class="chit-card-meta"><span class="badge active">${n} MEMBERS</span>${closed?'<span class="badge pending">CLOSED</span>':''}</div><div class="progress"><i style="width:${Math.min(100,(c.current||0)/(c.duration||1)*100)}%"></i></div><div class="muted">Monthly ${money(c.monthly||0)} · ${c.current||0}/${c.duration||0} months</div>${auctionLineHTML(c)}<div class="row" style="margin-top:8px"><button class="small-link" onclick="openGroupMembers('${c.id}')">View ${n} group members →</button><button class="small-link" onclick="openClosureReport('${c.id}')">📑 Settlement →</button></div></div>`}).join(''):'<div class="empty">No chits yet.<br><br><button class="btn gold" onclick="newChit()">Create your first chit</button></div>'}</div>`;}
 
 function editChit(id){
   const c=chitById(id); if(!c)return;
@@ -257,6 +262,8 @@ function editChit(id){
     <label class="field-label">Duration</label><input id="eDuration" type="number" value="${Number(c.duration||0)}" placeholder="Duration (months)">
     <label class="field-label">Type</label><select id="eType"><option value="fixed" ${c.type!=='dividend'?'selected':''}>Fixed Chit</option><option value="dividend" ${c.type==='dividend'?'selected':''}>Dividend Chit</option></select>
     <label class="field-label">Commission %</label><input id="eCommission" type="number" value="${Number(c.commission||0)}" placeholder="Commission %">
+    <label class="field-label">Next auction date</label><input id="eAuctionDate" type="date" value="${esc(c.nextAuctionDate||'')}">
+    <label class="field-label">Auction time</label><input id="eAuctionTime" type="time" value="${esc(c.auctionTime||'')}">
     <button class="btn gold full" onclick="updateChit('${String(id).replace(/'/g,"\'")}')">Save Changes</button>
   </div>`);
 }
@@ -265,6 +272,7 @@ function updateChit(id){
   const name=document.getElementById('eName').value.trim(), amount=Number(document.getElementById('eAmount').value), duration=Number(document.getElementById('eDuration').value);
   if(!name||!amount||!duration){uiAlert('Please enter chit name, amount and duration.');return;}
   c.name=name; c.amount=amount; c.duration=duration; c.type=document.getElementById('eType').value; c.commission=Number(document.getElementById('eCommission').value||0); c.monthly=amount/duration;
+  c.nextAuctionDate=document.getElementById('eAuctionDate').value||''; c.auctionTime=document.getElementById('eAuctionTime').value||''; save();
   logActivity('Record updated','System','MithraQ data was updated.'); closeModal(); render();
 }
 function deleteChit(id){
@@ -279,8 +287,8 @@ function deleteChit(id){
 function confirmDeleteChit(id){
   const sid=String(id); state.chits=state.chits.filter(c=>String(c.id)!==sid); state.members=state.members.filter(m=>!(m.chitIds||[]).map(String).includes(sid)); state.auctions=state.auctions.filter(a=>String(a.chitId)!==sid); save(); closeModal(); render();
 }
-function newChit(){openModal('Create New Chit',`<div class="form"><input id="fName" placeholder="Chit name"><input id="fAmount" type="number" placeholder="Total amount ₹"><input id="fDuration" type="number" placeholder="Duration (months)"><select id="fType"><option value="fixed">Fixed Chit</option><option value="dividend">Dividend Chit</option></select><input id="fCommission" type="number" placeholder="Commission % (optional)"><button class="btn gold full" onclick="createChit()">Create Chit</button></div>`);}
-function createChit(){const name=document.getElementById('fName').value.trim(),amount=Number(document.getElementById('fAmount').value),duration=Number(document.getElementById('fDuration').value),type=document.getElementById('fType').value,commission=Number(document.getElementById('fCommission').value||0);if(!name||!amount||!duration)return uiAlert('Please enter chit name, amount and duration.');state.chits.push({id:Date.now(),name,amount,duration,current:0,monthly:amount/duration,type,commission});save();closeModal();render();}
+function newChit(){openModal('Create New Chit',`<div class="form"><input id="fName" placeholder="Chit name"><input id="fAmount" type="number" placeholder="Total amount ₹"><input id="fDuration" type="number" placeholder="Duration (months)"><select id="fType"><option value="fixed">Fixed Chit</option><option value="dividend">Dividend Chit</option></select><input id="fCommission" type="number" placeholder="Commission % (optional)"><label class="field-label">Next auction date (optional)</label><input id="fAuctionDate" type="date"><label class="field-label">Auction time (optional)</label><input id="fAuctionTime" type="time"><button class="btn gold full" onclick="createChit()">Create Chit</button></div>`);}
+function createChit(){const name=document.getElementById('fName').value.trim(),amount=Number(document.getElementById('fAmount').value),duration=Number(document.getElementById('fDuration').value),type=document.getElementById('fType').value,commission=Number(document.getElementById('fCommission').value||0),nextAuctionDate=document.getElementById('fAuctionDate').value||'',auctionTime=document.getElementById('fAuctionTime').value||'';if(!name||!amount||!duration)return uiAlert('Please enter chit name, amount and duration.');state.chits.push({id:Date.now(),name,amount,duration,current:0,monthly:amount/duration,type,commission,nextAuctionDate,auctionTime});save();closeModal();render();}
 function filterMembers(){const q=(document.getElementById('memberSearch')?.value||'').trim().toLowerCase(),status=document.getElementById('memberStatusFilter')?.value||'all';document.querySelectorAll('.member-row').forEach(el=>{const hay=(el.dataset.search||''),st=el.dataset.status||'active';el.style.display=(!q||hay.includes(q))&&(status==='all'||st===status)?'':'none';});document.querySelectorAll('.member-group-count').forEach(box=>{const group=box.closest('.accordion-body');if(!group)return;const visible=[...group.querySelectorAll('.member-row')].filter(x=>x.style.display!=='none').length;box.textContent=visible+' shown';});}
 function members(){if(!state.chits.length)return `<div class="row"><div><h2 class="page-title">Members</h2><div class="subtitle">Create a chit group first.</div></div></div><div class="empty big-empty"><div class="empty-icon">♙</div><b>No chit groups available</b><p>Add a chit first. Members will be added <strong>group-wise</strong> only to the chit you select.</p><button class="btn gold" onclick="newChit()">+ Create Chit</button></div>`;return `<div class="row"><div><h2 class="page-title">Members</h2><div class="subtitle">${state.members.length} registered members • Chit wise</div></div><div class="member-head-actions"><button class="btn" onclick="exportMembersCSV()">📥 Export</button><button class="btn gold" onclick="newMember()">+ Add</button></div></div>${dataHealthCard()}<div class="member-toolbar"><input id="memberSearch" placeholder="Search member name, phone or ID..." oninput="filterMembers()"><select id="memberStatusFilter" onchange="filterMembers()"><option value="all">All status</option><option value="active">Active</option><option value="inactive">Inactive</option></select><span class="member-total">${state.members.length} total • ${state.members.filter(m=>m.status!=='inactive').length} active</span></div><div class="accordion-list">${state.chits.map(c=>{const n=membersForChit(c.id).length,cap=Number(c.duration||0),full=cap>0&&n>=cap;return `<div class="accordion-item" id="acc-${c.id}"><div class="accordion-header" onclick="toggleChitAccordion('${String(c.id)}')"><div><div class="chit-title">${esc(c.name)}</div><div class="muted">${n}/${cap||'∞'} members${full?' • FULL':''} • Monthly ${money(c.monthly||0)}</div></div><span class="accordion-arrow">▾</span></div><div class="accordion-body"><div class="member-group-count muted">${n} shown</div><div class="list">${groupMemberPanel(c.id)}</div></div></div>`}).join('')}</div>`;}
 function toggleChitAccordion(id){const item=document.getElementById('acc-'+id);if(!item)return;const willOpen=!item.classList.contains('open');if(willOpen)document.querySelectorAll('.accordion-item.open').forEach(x=>{if(x!==item)x.classList.remove('open')});item.classList.toggle('open',willOpen);if(willOpen)item.scrollIntoView({behavior:'smooth',block:'start'});}
@@ -409,6 +417,7 @@ function home(){
   <div class="hero"><small>♛ TOTAL CHIT PORTFOLIO</small><h2>${money(state.chits.reduce((s,c)=>s+Number(c.amount||0),0))}</h2><div class="muted hero-muted">Management overview for ${esc(monthLabel(month))}</div></div>
   <div class="grid dashboard-kpis"><div class="card"><div class="stat-label">COLLECTION</div><div class="stat-value">${money(d.collected)}</div><div class="muted">Expected ${money(d.expected)}</div></div><div class="card"><div class="stat-label">PENDING</div><div class="stat-value">${money(d.pending)}</div><div class="muted">${d.overdue} member(s)</div></div><div class="card"><div class="stat-label">ACTIVE MEMBERS</div><div class="stat-value">${d.activeMembers}</div><div class="muted">${state.members.length} total</div></div><div class="card"><div class="stat-label">ACTIVE CHITS</div><div class="stat-value">${d.activeChits}</div><div class="muted">${state.chits.length} total</div></div></div>
   <div class="dashboard-actions"><button class="dash-action" onclick="tab='collection';render()">₹<span>Payment</span></button><button class="dash-action" onclick="tab='members';render()">♙<span>Member</span></button><button class="dash-action" onclick="tab='auction';render()">♢<span>Auction</span></button><button class="dash-action" onclick="tab='chits';render()">▣<span>Chit</span></button><button class="dash-action" onclick="tab='reminders';render()">🔔<span>Reminders</span></button></div>
+  ${upcomingAuctionsCard()}
   <div class="section"><h3>Collection Trend</h3><span class="muted">Last 6 months</span></div><div class="card dash-chart"><div class="dash-bars">${trendBars}</div></div>
   <div class="dashboard-two"><div><div class="section"><h3>Payment Modes</h3><span class="muted">${d.payments.length} records</span></div><div class="card dash-modes">${modeRows}</div></div><div><div class="section"><h3>Latest Auction</h3><span class="muted">${d.auctions.length} this month</span></div><div class="card dash-auction">${lastAuction?`<div class="avatar">🏆</div><div><b>${esc(lastAuction.member||lastAuction.winner||'Winner')}</b><div class="muted">${esc(lastAuction.chit||'Auction')} • ${money(lastAuction.bid||lastAuction.amount||0)}</div></div>`:'<div class="empty">No auction recorded yet.</div>'}</div></div></div>
   <div class="section"><h3>Pending Payments</h3><span class="muted">${money(d.pending)} outstanding</span></div><div class="activity-list">${pendingTop.length?pendingTop.map(x=>`<div class="card activity-row"><div class="activity-icon">₹</div><div style="flex:1"><b>${esc(x.m.name)}</b><div class="muted">${esc(x.c.name)} • Pending ${money(x.balance)}</div></div><button class="mini-btn" onclick="whatsappPendingMember('${x.m.id}','${x.c.id}','${month}')">💬</button></div>`).join(''):'<div class="empty recent">🎉 No pending payments.</div>'}</div>
@@ -511,7 +520,7 @@ function auction(){
   if(!auctionGroupValue){
     return `<div class="row"><div><h2 class="page-title">Live</h2><div class="subtitle">Tap a chit to open the live auction</div></div><span class="badge active">LIVE</span></div>
     <div class="list">${state.chits.map(x=>`<button type="button" class="card live-chit-select" onclick="selectAuctionGroup('${String(x.id)}')">
-      <div class="row"><div><b class="chit-title">${esc(x.name)}</b><div class="muted">${money(x.amount)} • Monthly ${money(x.monthly)} • ${membersForChit(x.id).length} members</div></div><span class="badge active">OPEN →</span></div>
+      <div class="row"><div><b class="chit-title">${esc(x.name)}</b><div class="muted">${money(x.amount)} • Monthly ${money(x.monthly)} • ${membersForChit(x.id).length} members${auctionBadgeInline(x)?`<div style="margin-top:6px">${auctionBadgeInline(x)} <span class="muted">${auctionDateText(x)}</span></div>`:''}</div></div><span class="badge active">OPEN →</span></div>
     </button>`).join('')}</div>`;
   }
 
@@ -600,10 +609,10 @@ function confirmAuctionWinner(){
   if(!c||!m)return uiAlert('Winner details are no longer available.');
   const fin=auctionFinance(c,Number(last.bid));
   const rec={id:Date.now(),chit:c.name,chitId:c.id,member:m.name,memberId:m.id,bid:Number(last.bid),round:'Round '+auctionRoundValue,chitAmount:fin.chitAmount,dividend:fin.discount,auctionDiscount:fin.discount,commissionPct:Number(c.commission||0),commissionAmt:fin.commissionAmt,dividendPool:fin.dividendPool,shareCount:fin.shareCount,monthly:fin.monthly,dividendPerMember:fin.dividendPerMember,payable:fin.payable,paymentStatus:'Pending',dueDate:defaultDueDate(),date:new Date().toLocaleDateString('en-IN'),createdAt:new Date().toISOString(),bidHistory:auctionBids.map(x=>({...x}))};
-  state.auctions.unshift(rec); save(); auctionPendingWinner=null; auctionLastSubmitted=null; auctionBids=[]; render(); uiAlert('Winner confirmed and auction result saved.');
+  advanceAuctionDate(c); state.auctions.unshift(rec); save(); auctionPendingWinner=null; auctionLastSubmitted=null; auctionBids=[]; render(); uiAlert('Winner confirmed and auction result saved.');
 }
 function previewAuctionDividend(chitId){const c=chitById(chitId)||chitById(auctionGroupValue),el=document.getElementById('auctionDividendPreview');if(!el||!c)return;const bid=Number(document.getElementById('bid')?.value||0);if(!bid){el.innerHTML='<div class="muted">Enter the bid to calculate dividend automatically.</div>';return;}const fin=auctionFinance(c,bid,membersForChit(c.id).length);el.innerHTML=`<div class="row" style="margin:0 0 8px"><b>Automatic Dividend Calculation</b><span class="badge active">${fin.shareCount} SHARES</span></div><div class="muted" style="line-height:1.7">Bid/discount: <b>${money(bid)}</b> · Commission: <b>${money(fin.commissionAmt)}</b><br>Dividend pool: <b>${money(fin.dividendPool)}</b> ÷ ${fin.shareCount} members = <b>${money(fin.dividendPerMember)}</b> per member</div><div style="display:flex;justify-content:space-between;margin-top:10px;padding-top:10px;border-top:1px solid #dfe9e4"><span>Monthly installment</span><b>${money(fin.monthly)}</b></div><div style="display:flex;justify-content:space-between;margin-top:6px"><span>Payable after dividend</span><b>${money(fin.payable)}</b></div>`;}
-function saveAuction(){const c=chitById(auctionGroupValue)||chitById(document.getElementById('auctionChit')?.value),mid=document.getElementById('auctionMember')?.value,bid=Number(document.getElementById('bid')?.value||0);if(!c||!mid||!bid)return uiAlert('Select a member and enter the winning bid amount.');if(bid>Number(c.amount||0))return uiAlert('Bid cannot be greater than the chit value.');const m=state.members.find(x=>String(x.id)===String(mid));if(!m||!membersForChit(c.id).some(x=>String(x.id)===String(mid)))return uiAlert('Selected member does not belong to this chit group.');const dueDate=document.getElementById('dueDate')?.value||defaultDueDate();const fin=auctionFinance(c,bid);const rec={id:Date.now(),chit:c.name,chitId:c.id,member:m.name,memberId:m.id,bid,round:'Round '+auctionRoundValue,chitAmount:fin.chitAmount,dividend:fin.discount,auctionDiscount:fin.discount,commissionPct:Number(c.commission||0),commissionAmt:fin.commissionAmt,dividendPool:fin.dividendPool,shareCount:fin.shareCount,monthly:fin.monthly,dividendPerMember:fin.dividendPerMember,payable:fin.payable,dueDate,date:new Date().toLocaleDateString('en-IN'),createdAt:new Date().toISOString()};state.auctions.unshift(rec);save();clearInterval(auctionTimer);auctionRunning=false;uiAlert('Auction winner saved successfully.');render();}
+function saveAuction(){const c=chitById(auctionGroupValue)||chitById(document.getElementById('auctionChit')?.value),mid=document.getElementById('auctionMember')?.value,bid=Number(document.getElementById('bid')?.value||0);if(!c||!mid||!bid)return uiAlert('Select a member and enter the winning bid amount.');if(bid>Number(c.amount||0))return uiAlert('Bid cannot be greater than the chit value.');const m=state.members.find(x=>String(x.id)===String(mid));if(!m||!membersForChit(c.id).some(x=>String(x.id)===String(mid)))return uiAlert('Selected member does not belong to this chit group.');const dueDate=document.getElementById('dueDate')?.value||defaultDueDate();const fin=auctionFinance(c,bid);const rec={id:Date.now(),chit:c.name,chitId:c.id,member:m.name,memberId:m.id,bid,round:'Round '+auctionRoundValue,chitAmount:fin.chitAmount,dividend:fin.discount,auctionDiscount:fin.discount,commissionPct:Number(c.commission||0),commissionAmt:fin.commissionAmt,dividendPool:fin.dividendPool,shareCount:fin.shareCount,monthly:fin.monthly,dividendPerMember:fin.dividendPerMember,payable:fin.payable,dueDate,date:new Date().toLocaleDateString('en-IN'),createdAt:new Date().toISOString()};advanceAuctionDate(c);state.auctions.unshift(rec);save();clearInterval(auctionTimer);auctionRunning=false;uiAlert('Auction winner saved successfully.');render();}
 function editAuction(id){const a=state.auctions.find(x=>String(x.id)===String(id));if(!a)return;const c=chitById(a.chitId),list=c?membersForChit(c.id):[];openModal('Edit Auction Result',`<div class="form"><label class="field-label">Chit Group</label><select id="eaChit" onchange="renderEditAuctionMembers()">${state.chits.map(x=>`<option value="${String(x.id)}" ${String(x.id)===String(a.chitId)?'selected':''}>${esc(x.name)}</option>`).join('')}</select><label class="field-label">Winner / Bidder</label><div id="eaMembers"><select id="eaMember">${list.map(m=>`<option value="${String(m.id)}" ${String(m.id)===String(a.memberId)?'selected':''}>${esc(m.name)} • #${esc(m.memberNo||'—')}</option>`).join('')}</select></div><label class="field-label">Round</label><select id="eaRound">${[1,2,3].map(r=>`<option value="${r}" ${String(a.round||'Round 1')==='Round '+r?'selected':''}>Round ${r}</option>`).join('')}</select><label class="field-label">Winning bid ₹</label><input id="eaBid" type="number" min="1" value="${Number(a.bid||0)}"><label class="field-label">Winner Payment Status</label><select id="eaPayment"><option ${a.paymentStatus==='Pending'?'selected':''}>Pending</option><option ${a.paymentStatus==='Partial'?'selected':''}>Partial</option><option ${a.paymentStatus==='Paid'?'selected':''}>Paid</option></select><label class="field-label">Due Date</label><input id="eaDue" type="date" value="${esc(a.dueDate||defaultDueDate())}"><button class="btn gold full" onclick="updateAuction('${String(id)}')">Save Changes</button></div>`);}
 function renderEditAuctionMembers(){const c=chitById(document.getElementById('eaChit')?.value),el=document.getElementById('eaMembers');if(!c||!el)return;el.innerHTML=`<select id="eaMember">${membersForChit(c.id).map(m=>`<option value="${String(m.id)}">${esc(m.name)} • #${esc(m.memberNo||'—')}</option>`).join('')||'<option value="">No members</option>'}</select>`;}
 function updateAuction(id){const a=state.auctions.find(x=>String(x.id)===String(id));if(!a)return;const c=chitById(document.getElementById('eaChit')?.value),mid=document.getElementById('eaMember')?.value,bid=Number(document.getElementById('eaBid')?.value||0),r=Number(document.getElementById('eaRound')?.value||1),paymentStatus=document.getElementById('eaPayment')?.value||'Pending',dueDate=document.getElementById('eaDue')?.value||a.dueDate||defaultDueDate();if(!c||!mid||!bid)return uiAlert('Enter all auction details.');if(bid>Number(c.amount||0))return uiAlert('Bid cannot be greater than the chit value.');const m=state.members.find(x=>String(x.id)===String(mid));const fin=auctionFinance(c,bid);a.chit=c.name;a.chitId=c.id;a.member=m?.name||'';a.memberId=mid;a.bid=bid;a.round='Round '+r;a.paymentStatus=paymentStatus;a.dueDate=dueDate;a.chitAmount=fin.chitAmount;a.dividend=fin.discount;a.auctionDiscount=fin.discount;a.commissionPct=Number(c.commission||0);a.commissionAmt=fin.commissionAmt;a.dividendPool=fin.dividendPool;a.shareCount=fin.shareCount;a.monthly=fin.monthly;a.dividendPerMember=fin.dividendPerMember;a.payable=fin.payable;save();closeModal();render();}
@@ -626,6 +635,7 @@ function member360(memberId){
   openModal('Member Profile',`<div class="member360">
     <div class="profile-hero"><div class="avatar profile-avatar">${esc((m.name||'?')[0]).toUpperCase()}</div><div><h3>${esc(m.name)}</h3><div class="muted">Member #${esc(m.memberNo||'—')} • ${esc(m.phone||'No phone')}</div><div class="muted">Joined ${esc(m.joiningDate||'—')}</div><div class="muted">Address: ${esc(m.address||'—')}</div><div class="muted">Nominee: ${esc(m.nomineeName||'—')} ${m.nomineePhone?'• '+esc(m.nomineePhone):''}</div></div></div>
     <div class="profile-actions"><button class="btn gold" onclick="window.__profileReturnId='${String(m.id)}';editMember('${String(m.id)}')">✎ Edit</button><button class="btn" onclick="whatsappMember('${String(m.id)}')">💬 WhatsApp</button><button class="btn" onclick="printMemberStatement('${String(m.id)}')">🖨️ Print</button></div>
+    <button class="btn full" style="margin:0 0 12px" onclick="openPendingStatement('${String(m.id)}')">📋 Pending Statement (all chits)</button>
     <div class="profile-stats"><div><span>Total Paid</span><b>${money(paid)}</b></div><div><span>Pending Now</span><b>${money(currentDue)}</b></div><div><span>Auctions</span><b>${auc.length}</b></div></div>
     <div class="section"><h3>Chit Groups</h3><span class="muted">${groups.length} groups</span></div>
     <div class="profile-groups">${groups.map(c=>{const monthPayment=paymentFor(m.id,currentMonth);const due=memberMonthly(m,c);const paidThisMonth=Number(monthPayment?.amount||0);const status=paymentStatus(monthPayment,due);const label=status==='paid'?'PAID':status==='partial'?'PARTIAL':'PENDING';return `<div class="profile-group"><div><b>${esc(c.name)}</b><small>${c.type==='dividend'?'Dividend':'Fixed'} • Monthly ${money(due)}</small></div><div class="profile-group-right"><span class="profile-paid">${money(paidThisMonth)} / ${money(due)}</span><span class="badge ${status==='paid'?'active':status==='partial'?'partial':'pending'}">${label}</span></div></div>`}).join('')||'<div class="empty">No groups assigned.</div>'}</div>
@@ -1018,3 +1028,139 @@ window.addEventListener('popstate',(e)=>{
     __navPopping=false;
   }
 });
+
+/* ===== Phase 11: Next Auction Date + Reminders ===== */
+function auctionDaysLeft(iso){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(String(iso||'')))return null;
+  const [y,m,d]=iso.split('-').map(Number),t=new Date();
+  return Math.round((new Date(y,m-1,d)-new Date(t.getFullYear(),t.getMonth(),t.getDate()))/86400000);
+}
+function fmtTime12(t){
+  const [h,m]=String(t||'').split(':').map(Number);
+  if(isNaN(h))return '';
+  return ((h%12)||12)+':'+String(m||0).padStart(2,'0')+' '+(h>=12?'PM':'AM');
+}
+function auctionDateText(c){
+  return formatDMY(c.nextAuctionDate)+(c.auctionTime?' at '+fmtTime12(c.auctionTime):'');
+}
+function auctionBadgeInline(c){
+  const n=auctionDaysLeft(c.nextAuctionDate);
+  if(n===null)return '';
+  const txt=n<0?`Auction date passed (${-n}d ago)`:n===0?'Auction TODAY':n===1?'Auction tomorrow':`Auction in ${n} days`;
+  const cls=n<0?'pending':n<=3?'partial':'active';
+  return `<span class="badge ${cls}">${txt}</span>`;
+}
+function auctionLineHTML(c){
+  if(!c.nextAuctionDate)return `<div class="auction-line"><span class="muted">No next auction date set</span></div>`;
+  return `<div class="auction-line">${auctionBadgeInline(c)}<span class="muted">${auctionDateText(c)}</span><button class="small-link" type="button" onclick="openAuctionReminder('${String(c.id)}')">💬 Remind members →</button></div>`;
+}
+function upcomingAuctionsCard(){
+  const list=state.chits.map(c=>({c,n:auctionDaysLeft(c.nextAuctionDate)})).filter(x=>x.n!==null&&x.n<=7&&x.n>=-3&&x.c.status!=='completed').sort((a,b)=>a.n-b.n);
+  if(!list.length)return '';
+  return `<div class="section"><h3>Upcoming Auctions</h3><span class="muted">Next 7 days</span></div><div class="list">${list.map(({c})=>`<div class="card upcoming-auction"><div style="flex:1"><b>${esc(c.name)}</b><div class="muted">${auctionDateText(c)}</div></div>${auctionBadgeInline(c)}<button class="mini-btn" type="button" onclick="openAuctionReminder('${String(c.id)}')">💬</button></div>`).join('')}</div>`;
+}
+function advanceAuctionDate(c){
+  if(!c||!/^\d{4}-\d{2}-\d{2}$/.test(String(c.nextAuctionDate||'')))return;
+  const [y,m,d]=c.nextAuctionDate.split('-').map(Number);
+  const last=new Date(y,m+1,0).getDate();
+  const nd=new Date(y,m,Math.min(d,last));
+  c.lastAuctionDate=c.nextAuctionDate;
+  c.nextAuctionDate=nd.getFullYear()+'-'+String(nd.getMonth()+1).padStart(2,'0')+'-'+String(nd.getDate()).padStart(2,'0');
+}
+function auctionReminderText(c,m){
+  return `MithraQ Auction Reminder\n\nDear ${m.name},\nYour ${c.name} chit auction is on ${auctionDateText(c)}.\nMonthly amount: ${money(memberMonthly(m,c))}\n\nPlease be available. Thank you.`;
+}
+function openAuctionReminder(chitId){
+  const c=chitById(chitId);if(!c)return;
+  if(!c.nextAuctionDate)return uiAlert('Set a next auction date for this chit first (Chits → ✎ Edit).');
+  const sent=(c.auctionReminded&&c.auctionReminded.date===c.nextAuctionDate)?c.auctionReminded.ids.map(String):[];
+  const list=membersForChit(c.id).filter(m=>m.status!=='inactive');
+  openModal('Auction Reminder',`<div class="form"><div class="card" style="margin:0"><b>${esc(c.name)}</b><div class="muted">Auction: ${auctionDateText(c)}</div></div>
+    <div class="muted" style="margin:4px 0">Tap 💬 to open WhatsApp for each member.</div>
+    <div class="list">${list.length?list.map(m=>{const ok=!!waIntlPhone(m.phone),done=sent.includes(String(m.id));return `<div class="card row" style="margin:0"><div style="flex:1"><b>${esc(m.name)}</b><div class="muted">${esc(m.phone||'No phone')}${ok?'':' • invalid'}</div></div>${done?'<span class="badge active">SENT</span>':''}<button class="mini-btn" type="button" ${ok?'':'disabled'} onclick="sendAuctionReminder('${String(c.id)}','${String(m.id)}')">💬</button></div>`}).join(''):'<div class="empty">No active members in this chit.</div>'}</div></div>`);
+}
+function sendAuctionReminder(chitId,memberId){
+  const c=chitById(chitId),m=state.members.find(x=>String(x.id)===String(memberId));if(!c||!m)return;
+  if(!waOpenOrWarn(m.phone,auctionReminderText(c,m)))return;
+  if(!c.auctionReminded||c.auctionReminded.date!==c.nextAuctionDate)c.auctionReminded={date:c.nextAuctionDate,ids:[]};
+  if(!c.auctionReminded.ids.map(String).includes(String(m.id)))c.auctionReminded.ids.push(String(m.id));
+  save();
+  setTimeout(()=>openAuctionReminder(chitId),300);
+}
+
+/* ===== Phase 11: Member-wise Pending Statement (all chits) ===== */
+function paymentForChit(memberId,chitId,month){
+  return state.payments.find(p=>String(p.memberId)===String(memberId)&&p.month===month&&(!p.chitId||String(p.chitId)===String(chitId)));
+}
+function monthRange(startYM,endYM){
+  const out=[];let [y,m]=startYM.split('-').map(Number);const [ey,em]=endYM.split('-').map(Number);
+  while((y<ey||(y===ey&&m<=em))&&out.length<120){out.push(y+'-'+String(m).padStart(2,'0'));m++;if(m>12){m=1;y++;}}
+  return out;
+}
+function memberDuesData(memberId,month,includePrev){
+  const m=state.members.find(x=>String(x.id)===String(memberId));if(!m)return null;
+  const rows=[];let total=0;
+  (m.chitIds||[]).map(chitById).filter(c=>c&&c.status!=='completed').forEach(c=>{
+    const monthly=memberMonthly(m,c);
+    let months=[month];
+    if(includePrev){
+      const join=String(m.joiningDate||'').slice(0,7);
+      const start=(/^\d{4}-\d{2}$/.test(join)&&join<month)?join:month;
+      months=monthRange(start,month);
+      const cap=Number(c.duration||0);if(cap>0&&months.length>cap)months=months.slice(-cap);
+    }
+    const items=[];
+    months.forEach(mo=>{const p=paymentForChit(m.id,c.id,mo),paid=Number(p?.amount||0),bal=Math.max(0,monthly-paid);if(bal>0)items.push({month:mo,expected:monthly,paid,balance:bal});});
+    const sub=items.reduce((s,x)=>s+x.balance,0);total+=sub;
+    rows.push({c,monthly,items,sub});
+  });
+  return {m,month,rows,total};
+}
+function memberDuesText(d){
+  let t=`MithraQ Pending Statement\n\nDear ${d.m.name} (Member ID ${d.m.memberNo||'—'}),\nPending as of ${monthLabel(d.month)}:\n`;
+  d.rows.forEach(r=>{
+    if(!r.items.length)return;
+    t+=`\n${r.c.name} — ${money(r.sub)}\n`;
+    r.items.forEach(x=>{t+=`  • ${monthLabel(x.month)}: ${money(x.balance)}`+(x.paid>0?` (paid ${money(x.paid)} of ${money(x.expected)})`:'')+`\n`;});
+  });
+  t+=`\nTotal Pending: ${money(d.total)}\n\nPlease pay at your earliest convenience. Thank you.`;
+  return t;
+}
+function psOptions(){
+  return {month:document.getElementById('psMonth')?.value||new Date().toISOString().slice(0,7),prev:document.getElementById('psPrev')?document.getElementById('psPrev').checked:true};
+}
+function openPendingStatement(memberId){
+  const m=state.members.find(x=>String(x.id)===String(memberId));if(!m)return;
+  openModal('Pending Statement',`<div class="form"><div class="card" style="margin:0"><b>${esc(m.name)}</b><div class="muted">Member ${esc(m.memberNo||'—')} • ${esc(m.phone||'No phone')}</div></div>
+    <label class="field-label">Pending as of month</label><input id="psMonth" type="month" value="${new Date().toISOString().slice(0,7)}" onchange="renderPendingStatement('${String(m.id)}')">
+    <label class="group-check"><input id="psPrev" type="checkbox" checked onchange="renderPendingStatement('${String(m.id)}')"><span>Include earlier months' dues (from joining date)</span></label>
+    <div id="psBody"></div>
+    <div class="profile-actions" style="grid-template-columns:1fr 1fr"><button class="btn" type="button" onclick="whatsappPendingStatement('${String(m.id)}')">💬 WhatsApp</button><button class="btn gold" type="button" onclick="pdfPendingStatement('${String(m.id)}')">📄 PDF</button></div>
+    <button class="btn full" type="button" onclick="member360('${String(m.id)}')">← Back to Profile</button></div>`);
+  renderPendingStatement(memberId);
+}
+function renderPendingStatement(memberId){
+  const el=document.getElementById('psBody');if(!el)return;
+  const o=psOptions(),d=memberDuesData(memberId,o.month,o.prev);if(!d){el.innerHTML='';return;}
+  const rows=d.rows.filter(r=>r.items.length);
+  el.innerHTML=rows.length?rows.map(r=>`<div class="card" style="margin:8px 0"><div class="row"><b>${esc(r.c.name)}</b><b>${money(r.sub)}</b></div>${r.items.map(x=>`<div class="row muted"><span>${esc(monthLabel(x.month))}${x.paid>0?' (partial)':''}</span><span>${money(x.balance)}</span></div>`).join('')}</div>`).join('')+`<div class="card" style="margin:8px 0;background:#fff7e0"><div class="row"><b>Total Pending</b><b>${money(d.total)}</b></div></div>`:'<div class="empty">No pending dues 🎉</div>';
+}
+function whatsappPendingStatement(memberId){
+  const o=psOptions(),d=memberDuesData(memberId,o.month,o.prev);if(!d)return;
+  if(d.total<=0)return uiAlert('No pending dues for '+d.m.name+'.');
+  if(!d.m.phone)return uiAlert('Member phone number is missing.');
+  waOpenOrWarn(d.m.phone,memberDuesText(d));
+}
+function pdfPendingStatement(memberId){
+  const JsPDF=ensureJsPDF();if(!JsPDF)return;
+  const o=psOptions(),d=memberDuesData(memberId,o.month,o.prev);if(!d)return;
+  const doc=new JsPDF();
+  doc.setFont('helvetica','bold');doc.setFontSize(20);doc.setTextColor(5,107,79);doc.text('MithraQ',40,40);
+  doc.setFontSize(13);doc.setTextColor(60,60,60);doc.text('Pending Statement — '+monthLabel(d.month),40,60);
+  doc.setFontSize(11);doc.text(`${d.m.name}  •  ${d.m.phone||''}  •  Member ${d.m.memberNo||'—'}`,40,78);
+  const body=[];d.rows.forEach(r=>r.items.forEach(x=>body.push([r.c.name,monthLabel(x.month),pdfMoney(x.expected),pdfMoney(x.paid),pdfMoney(x.balance)])));
+  doc.autoTable({startY:92,head:[['Chit','Month','Expected','Paid','Pending']],body:body.length?body:[['No pending dues','','','','']],styles:{fontSize:9},headStyles:{fillColor:[5,107,79]}});
+  const y=(doc.lastAutoTable&&doc.lastAutoTable.finalY)||100;
+  doc.setFontSize(13);doc.setTextColor(5,107,79);doc.text('Total Pending: '+pdfMoney(d.total),40,y+24);
+  doc.save('MithraQ-Pending-'+(d.m.memberNo||d.m.id)+'.pdf');
+}
