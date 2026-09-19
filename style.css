@@ -816,3 +816,12 @@ input::placeholder,textarea::placeholder{font-weight:600;opacity:.8}
 
 .menu-sheet-grid button:active .menu-sheet-icon{transform:scale(.94)}
 .menu-sheet-badge{background:linear-gradient(135deg,#ff6b5a,#d9304a);box-shadow:0 0 0 2px #fff,0 4px 8px rgba(217,48,74,.4)}
+
+/* ===== Softer background (opacity only) =====
+   Money notes / rupee pattern and the falling money are toned down a little.
+   Nothing else is changed. To adjust: raise or lower these numbers. */
+.app::before{opacity:.55}
+.money-rain{opacity:.40}
+@media(max-width:430px){.money-rain{opacity:.30}}
+html[data-theme="dark"] .app::before{opacity:.32}
+html[data-theme="dark"] .money-rain{opacity:.24}
