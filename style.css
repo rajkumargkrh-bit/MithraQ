@@ -524,3 +524,36 @@ body{background:radial-gradient(circle at 15% 5%,rgba(214,162,31,.08),transparen
 .menu-sheet-card,.modal-card{background:rgba(251,255,253,.88);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.75)}
 .money-rain{opacity:.52}
 @media(max-width:430px){.money-rain{opacity:.38}.hero{border-radius:22px}.card{border-radius:18px}}
+
+/* ===== Fixed Bottom Navigation Alignment Fix =====
+   Keep the premium navigation locked to the viewport on every page.
+   The decorative-layer stacking rule above must not override fixed positioning. */
+.bottom-nav{
+  position:fixed !important;
+  left:50% !important;
+  right:auto !important;
+  bottom:max(10px, env(safe-area-inset-bottom)) !important;
+  transform:translateX(-50%) !important;
+  z-index:100 !important;
+  width:min(calc(100% - 24px), 692px) !important;
+  box-sizing:border-box;
+}
+.content{
+  padding-bottom:calc(118px + env(safe-area-inset-bottom)) !important;
+}
+@media(max-width:430px){
+  .bottom-nav{
+    width:calc(100% - 20px) !important;
+    bottom:max(8px, env(safe-area-inset-bottom)) !important;
+    border-radius:25px;
+  }
+  .content{
+    padding-bottom:calc(124px + env(safe-area-inset-bottom)) !important;
+  }
+}
+@media(min-width:700px){
+  .bottom-nav{
+    position:fixed !important;
+    bottom:max(14px, env(safe-area-inset-bottom)) !important;
+  }
+}
