@@ -1314,13 +1314,24 @@ function prizeVoucherData(aid,pid){
   const upTo=list.slice(0,idx+1).reduce((s,x)=>s+Number(x.amount||0),0);
   return {a,p,i,m,upTo,left:Math.max(0,i.due-upTo)};
 }
+function prizeVoucherHTML(d){
+  const {a,p,i,m,upTo,left}=d;
+  const row=(k,v)=>`<div class="v-row"><span>${k}</span><b>${v}</b></div>`;
+  return `<div class="voucher-sheet"><h1>MithraQ</h1><div class="v-sub">Prize Payout Voucher</div><div class="v-box">${row('Voucher No',esc(p.voucherNo))}${row('Date',formatDMY(p.date))}${row('Group',esc(a.chit||''))}${row('Winner',esc(a.member||'')+' (#'+esc(m?.memberNo||'—')+')')}${row('Round',esc(a.round||'Round 1'))}${row('Chit Amount',money(a.chitAmount))}${row('Winning Bid',money(a.bid))}${row('Prize Amount',money(i.gross))}${i.deduction>0?row('Deduction'+(a.prizeDeductionNote?' ('+esc(a.prizeDeductionNote)+')':''),'- '+money(i.deduction)):''}${row('Prize Payable',money(i.due))}${row('Mode',esc(p.mode||''))}${p.note?row('Reference',esc(p.note)):''}${row('Total paid so far',money(upTo))}${row('Balance',money(left))}<div class="v-total">Paid now: ${money(p.amount)}</div></div><div class="v-sign"><div>Paid by</div><div>Received by (Winner)</div></div></div>`;
+}
+/* Shown inside the app (no pop-up window), so the Back button / Close always works on phones */
 function printPrizeVoucher(aid,pid){
   const d=prizeVoucherData(aid,pid);if(!d)return;
-  const {a,p,i,m,upTo,left}=d;
-  const w=window.open('','_blank','width=520,height=780');
-  if(!w){uiAlert('Please allow pop-ups to print.');return;}
-  w.document.write(`<html><head><title>${esc(p.voucherNo)} - MithraQ</title><style>body{font-family:Arial;padding:28px;color:#24463d;max-width:460px;margin:auto}h1{color:#056b4f;margin-bottom:4px}.box{border:1px solid #ddd;border-radius:14px;padding:16px;margin-top:18px}.r{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid #eee}.total{font-size:22px;font-weight:800;color:#056b4f;margin-top:15px}.sign{display:flex;justify-content:space-between;margin-top:46px;font-size:12px;color:#71817c}.sign div{border-top:1px solid #999;padding-top:6px;width:44%;text-align:center}button{margin-top:22px;padding:10px 15px;border:0;border-radius:9px;background:#056b4f;color:white}@media print{button{display:none}}</style></head><body><h1>MithraQ</h1><div>Prize Payout Voucher</div><div class="box"><div class="r"><span>Voucher No</span><b>${esc(p.voucherNo)}</b></div><div class="r"><span>Date</span><b>${formatDMY(p.date)}</b></div><div class="r"><span>Group</span><b>${esc(a.chit||'')}</b></div><div class="r"><span>Winner</span><b>${esc(a.member||'')} (#${esc(m?.memberNo||'—')})</b></div><div class="r"><span>Round</span><b>${esc(a.round||'Round 1')}</b></div><div class="r"><span>Chit Amount</span><b>${money(a.chitAmount)}</b></div><div class="r"><span>Winning Bid</span><b>${money(a.bid)}</b></div><div class="r"><span>Prize Amount</span><b>${money(i.gross)}</b></div>${i.deduction>0?`<div class="r"><span>Deduction${a.prizeDeductionNote?' ('+esc(a.prizeDeductionNote)+')':''}</span><b>- ${money(i.deduction)}</b></div>`:''}<div class="r"><span>Prize Payable</span><b>${money(i.due)}</b></div><div class="r"><span>Mode</span><b>${esc(p.mode||'')}</b></div>${p.note?`<div class="r"><span>Reference</span><b>${esc(p.note)}</b></div>`:''}<div class="r"><span>Total paid so far</span><b>${money(upTo)}</b></div><div class="r"><span>Balance</span><b>${money(left)}</b></div><div class="total">Paid now: ${money(p.amount)}</div></div><div class="sign"><div>Paid by</div><div>Received by (Winner)</div></div><button onclick="window.print()">Print Voucher</button></body></html>`);
-  w.document.close();
+  const id=String(aid),pd=String(pid);
+  openModal('Prize Voucher',`${prizeVoucherHTML(d)}<div class="voucher-actions"><button class="btn gold" onclick="doPrintVoucher()">🖨 Print</button><button class="btn" onclick="pdfPrizeVoucher('${id}','${pd}')">📄 PDF</button><button class="btn" onclick="whatsappPrizePayout('${id}','${pd}')">💬 Share</button><button class="btn" onclick="closeModal()">✕ Close</button></div>`);
+}
+function doPrintVoucher(){
+  const src=document.querySelector('#modalBody .voucher-sheet');if(!src)return;
+  let root=document.getElementById('printRoot');
+  if(!root){root=document.createElement('div');root.id='printRoot';document.body.appendChild(root);}
+  root.innerHTML=src.outerHTML;
+  window.addEventListener('afterprint',()=>{root.innerHTML='';},{once:true});
+  try{window.print();}catch(e){root.innerHTML='';uiAlert('Printing is not supported on this device. Please use the PDF button.');}
 }
 function pdfPrizeVoucher(aid,pid){
   const JsPDF=ensureJsPDF();if(!JsPDF)return;

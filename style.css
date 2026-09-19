@@ -394,3 +394,23 @@ html[data-theme="dark"] .prize-grid b{color:#e7f2ed}
 html[data-theme="dark"] .prize-head{color:#7ed6b3}
 html[data-theme="dark"] .prize-legacy{background:#1f2416;border-color:#4a4322}
 html[data-theme="dark"] .prize-hist{border-color:#294038}
+
+/* Voucher shown inside the app + print support */
+#printRoot{display:none}
+.voucher-sheet h1{color:var(--green);margin:0 0 2px;font-size:26px}
+.voucher-sheet .v-sub{color:var(--muted);font-size:13px}
+.v-box{border:1px solid var(--border);border-radius:14px;padding:6px 14px 14px;margin-top:12px}
+.v-row{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--border);font-size:14px}
+.v-row b{text-align:right}
+.v-total{font-size:20px;font-weight:800;color:var(--green);margin-top:14px}
+.v-sign{display:flex;justify-content:space-between;margin-top:38px;font-size:12px;color:var(--muted)}
+.v-sign div{border-top:1px solid #999;padding-top:6px;width:44%;text-align:center}
+.voucher-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:18px}
+html[data-theme="dark"] .voucher-sheet{color:#e7f2ed}
+html[data-theme="dark"] .v-row,html[data-theme="dark"] .v-box{border-color:#294038}
+@media print{
+  body>*:not(#printRoot){display:none!important}
+  #printRoot{display:block!important;max-width:460px;margin:0 auto;padding:24px;color:#24463d;font-family:Arial,sans-serif}
+  #printRoot .v-row,#printRoot .v-box{border-color:#ddd}
+  #printRoot .v-sub,#printRoot .v-sign{color:#71817c}
+}
