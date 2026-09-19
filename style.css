@@ -459,8 +459,9 @@ body::before{
     radial-gradient(circle at 12% 15%,rgba(5,107,79,.10) 0 3px,transparent 4px),
     radial-gradient(circle at 88% 78%,rgba(214,162,31,.12) 0 3px,transparent 4px),
     linear-gradient(135deg,rgba(5,107,79,.035),transparent 42%,rgba(214,162,31,.05)),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='320' viewBox='0 0 360 320'%3E%3Cg fill='none' stroke='%23c8a84e' stroke-width='1.8' opacity='.55'%3E%3Cpath d='M-30 72 C60 8 130 128 220 58 S330 18 390 72'/%3E%3Cpath d='M-30 270 C65 204 145 326 235 258 S330 220 390 275'/%3E%3C/g%3E%3Cg fill='%23056b4f' opacity='.14' font-family='Arial,sans-serif' font-weight='700'%3E%3Ctext x='32' y='120' font-size='76' transform='rotate(-14 32 120)'%3E₹%3C/text%3E%3Ctext x='258' y='212' font-size='82' transform='rotate(12 258 212)'%3E₹%3C/text%3E%3Ctext x='138' y='304' font-size='60' transform='rotate(-8 138 304)'%3E₹%3C/text%3E%3C/g%3E%3Cg fill='%23d6a21f' opacity='.14'%3E%3Crect x='246' y='34' width='88' height='50' rx='7' transform='rotate(13 290 59)'/%3E%3Crect x='14' y='228' width='92' height='52' rx='7' transform='rotate(-12 60 254)'/%3E%3C/g%3E%3Cg fill='%23d6a21f' opacity='.65'%3E%3Ccircle cx='326' cy='130' r='4'/%3E%3Ccircle cx='82' cy='185' r='3'/%3E%3Ccircle cx='210' cy='110' r='3'/%3E%3C/g%3E%3C/svg%3E");
-  background-size:auto,auto,auto,360px 320px;
+    url("assets/money-notes.svg"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='320' viewBox='0 0 360 320'%3E%3Cg fill='none' stroke='%23c8a84e' stroke-width='1.8' opacity='.55'%3E%3Cpath d='M-30 72 C60 8 130 128 220 58 S330 18 390 72'/%3E%3Cpath d='M-30 270 C65 204 145 326 235 258 S330 220 390 275'/%3E%3C/g%3E%3Cg fill='%23056b4f' opacity='.14' font-family='Arial,sans-serif' font-weight='700'%3E%3Ctext x='32' y='120' font-size='76' transform='rotate(-14 32 120)'%3E₹%3C/text%3E%3Ctext x='258' y='212' font-size='82' transform='rotate(12 258 212)'%3E₹%3C/text%3E%3Ctext x='138' y='304' font-size='60' transform='rotate(-8 138 304)'%3E₹%3C/text%3E%3C/g%3E%3Cg fill='%23d6a21f' opacity='.65'%3E%3Ccircle cx='326' cy='130' r='4'/%3E%3Ccircle cx='82' cy='185' r='3'/%3E%3Ccircle cx='210' cy='110' r='3'/%3E%3C/g%3E%3C/svg%3E");
+  background-size:auto,auto,auto,360px 320px,360px 320px;
   background-repeat:repeat;
 }
 
@@ -501,13 +502,16 @@ body::before{
   box-shadow:inset 0 0 0 2px rgba(255,255,255,.16);
 }
 .money-rain .money-particle.note{
-  width:calc(var(--size) * 1.55);
-  height:calc(var(--size) * .88);
-  border:1px solid currentColor;
-  border-radius:5px;
-  background:rgba(214,162,31,.045);
-  font-size:calc(var(--size) * .5);
+  width:calc(var(--size) * 2.8);
+  height:calc(var(--size) * 1.46);
+  border:0;
+  border-radius:0;
+  font-size:0;
+  background:url("assets/note-green.svg") center/100% 100% no-repeat;
+  opacity:calc(var(--opacity) * 2.4);
+  filter:drop-shadow(0 3px 4px rgba(3,74,55,.14));
 }
+.money-rain .money-particle.note.gold{background-image:url("assets/note-gold.svg")}
 @keyframes moneyFall{
   0%{transform:translate3d(0,-55px,0) rotate(var(--rotate))}
   25%{transform:translate3d(var(--drift),25vh,0) rotate(calc(var(--rotate) + 70deg))}
@@ -586,3 +590,12 @@ body{background:radial-gradient(circle at 15% 5%,rgba(214,162,31,.08),transparen
 
 /* Hero card: the grey .muted colour won over .hero-muted, leaving the subtitle unreadable on green */
 .hero .hero-muted,.hero .muted{color:#f2fbf7}
+
+
+/* ===== Real-money background — one look on every screen ===== */
+html[data-theme="dark"] .app::before{opacity:.42}
+.auth-screen{
+  background:
+    url("assets/money-notes.svg") 0 0/360px 320px repeat,
+    radial-gradient(circle at top,#e8f4ee,#f7faf6 58%,#fff8df);
+}

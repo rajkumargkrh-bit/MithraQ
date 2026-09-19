@@ -1498,9 +1498,9 @@ function profitDashboardPage(){
   const rand=(min,max)=>Math.random()*(max-min)+min;
   for(let i=0;i<count;i++){
     const el=document.createElement('span');
-    const note=Math.random()<0.18;
-    el.className='money-particle '+(note?'note':'coin');
-    el.textContent=note?'₹':symbols[Math.floor(Math.random()*symbols.length)];
+    const note=Math.random()<0.34;
+    el.className='money-particle '+(note?'note'+(Math.random()<.4?' gold':''):'coin');
+    el.textContent=note?'':symbols[Math.floor(Math.random()*symbols.length)];
     el.style.setProperty('--x',rand(2,96)+'%');
     el.style.setProperty('--size',Math.round(rand(15,29))+'px');
     el.style.setProperty('--duration',rand(12,24).toFixed(1)+'s');
