@@ -176,7 +176,7 @@ function backupData(){const payload={app:'MithraQ',version:5,exportedAt:new Date
 function restoreData(){document.getElementById('restoreFile')?.click();}
 function handleRestore(input){const f=input.files?.[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const x=JSON.parse(r.result);const d=x.data||x;if(!d||!Array.isArray(d.chits)||!Array.isArray(d.members))throw new Error('Invalid backup');uiConfirm('Restore this backup? Current data will be replaced.',()=>{snapshotBeforeRestore();state=buildRestoredState(d);state.members.forEach(normalizeMember);save();uiAlert('Backup restored successfully.');tab='home';render();input.value='';},()=>{input.value='';});}catch(e){uiAlert('Invalid MithraQ backup file.');input.value='';}};r.readAsText(f);}
 function settingsPanel(){const a=getAuth();return `<div class="card"><h3 style="margin-top:0">Security & Data</h3><div class="muted">Admin: ${esc(a?.name||"Admin")} • Username: ${esc(a?.username||"—")}</div><div class="backup-grid"><button class="btn" onclick="logoutAdmin()">🔒 Logout</button><button class="btn gold" onclick="backupData()">⬇️ Backup Data</button><button class="btn" onclick="restoreData()">⬆️ Restore Data</button></div><input id="restoreFile" class="file-input" type="file" accept="application/json,.json" onchange="handleRestore(this)"><div class="backup-note">Backup includes chits, members, auctions, payments and reminder history. Browser login remains available offline.</div></div>`+supabasePanel()}
-const MENU_TABS=['members','reports','search','history','settings','notifications','activity','payouts'];
+const MENU_TABS=['members','reports','search','history','settings','notifications','activity','payouts','profit'];
 let waBroadcastMsg='Hello {name}, this is an update from MithraQ regarding your {chit} chit. Thank you.';
 function waRowHTML(m,payments){
   const paid=payments.filter(p=>String(p.memberId)===String(m.id)).reduce((a,p)=>a+Number(p.amount||0),0);
@@ -244,6 +244,7 @@ function render(){
     else if(tab==='whatsapp')html=whatsappCenter();
     else if(tab==='closure')html=closureReport();
     else if(tab==='payouts')html=payoutsPage();
+    else if(tab==='profit')html=profitDashboardPage();
     if(typeof html!=='string' || !html.trim()) throw new Error('Empty page output');
     app.innerHTML=html;
   }catch(err){
@@ -477,7 +478,7 @@ function reports(){
   const modeCards=Object.entries(d.modes).filter(([,v])=>v>0).map(([k,v])=>`<div class="card analytics-mode"><div class="stat-label">${esc(k.toUpperCase())}</div><div class="stat-value">${money(v)}</div><div class="analytics-bar"><i style="width:${Math.min(100,(v/modeTotal)*100)}%"></i></div><div class="muted">${((v/modeTotal)*100).toFixed(1)}% of collection</div></div>`).join('');
   const memberTop=Object.entries(d.byMember).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([id,v])=>{const m=state.members.find(x=>String(x.id)===id);return `<div class="analytics-row"><div class="avatar">${esc((m?.name||'?')[0]).toUpperCase()}</div><div style="flex:1"><b>${esc(m?.name||id)}</b><div class="muted">${esc(m?.memberNo||'')}</div></div><strong>${money(v)}</strong></div>`}).join('');
   const chitTop=Object.entries(d.byChit).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([id,v])=>{const c=chitById(id);return `<div class="analytics-row"><div class="analytics-icon">▣</div><div style="flex:1"><b>${esc(c?.name||id)}</b></div><strong>${money(v)}</strong></div>`}).join('');
-  return `<div class="row"><div><h2 class="page-title">Reports</h2><div class="subtitle">Collection, members, payment modes & auction analytics</div></div><div class="report-head-actions"><button class="btn" onclick="printReports('${month}')">🖨️ Print</button><button class="btn" onclick="pdfMonthlyReport('${month}')">📄 PDF</button><button class="btn reminder-open" onclick="tab='reminders';render()">🔔 Reminders</button><input class="month-picker" type="month" value="${month}" onchange="setReportMonth(this.value)"></div></div>
+  return `<div class="row"><div><h2 class="page-title">Reports</h2><div class="subtitle">Collection, members, payment modes & auction analytics</div></div><div class="report-head-actions"><button class="btn" onclick="printReports('${month}')">🖨️ Print</button><button class="btn" onclick="pdfMonthlyReport('${month}')">📄 PDF</button><button class="btn reminder-open" onclick="tab='reminders';render()">🔔 Reminders</button><button class="btn reminder-open" onclick="tab='profit';render()">📊 Profit</button><input class="month-picker" type="month" value="${month}" onchange="setReportMonth(this.value)"></div></div>
   <div class="grid analytics-kpis"><div class="card"><div class="stat-label">EXPECTED</div><div class="stat-value">${money(d.expected)}</div></div><div class="card"><div class="stat-label">COLLECTED</div><div class="stat-value">${money(d.collected)}</div></div><div class="card"><div class="stat-label">PENDING</div><div class="stat-value">${money(d.pending)}</div></div><div class="card"><div class="stat-label">AUCTION VALUE</div><div class="stat-value">${money(d.auctionValue)}</div></div></div>
   <div class="card analytics-progress"><div class="row"><b>Collection Progress</b><strong>${d.expected?((d.collected/d.expected)*100).toFixed(1):0}%</strong></div><div class="progress"><i style="width:${d.expected?Math.min(100,(d.collected/d.expected)*100):0}%"></i></div><div class="muted">${d.paidCount} fully paid • ${d.partialCount} partial • ${rows.length} pending members</div></div>
   <div class="section"><h3>Payment Mode Breakdown</h3><span class="muted">${ps.length} records</span></div><div class="analytics-grid">${modeCards||'<div class="empty">No payments recorded for this month.</div>'}</div>
@@ -618,6 +619,7 @@ function auctionBidHistoryHTML(a){
 }
 function selectAuctionGroup(id){auctionGroupValue=String(id);auctionRoundValue=1;render();}
 function selectAuctionRound(r){auctionRoundValue=Number(r)||1;const el=document.getElementById('roundNo');if(el)el.textContent=auctionRoundValue;document.querySelectorAll('.round-pill').forEach((b,i)=>b.classList.toggle('selected',i+1===auctionRoundValue));}
+function cancelAuctionRound(){auctionRunning=false;clearInterval(auctionTimer);auctionSeconds=0;auctionBids=[];auctionLastSubmitted=null;auctionPendingWinner=null;render();}
 function startAuctionTimer(){
   const t=document.getElementById('timer'),btn=document.getElementById('auctionTimerBtn');
   if(!btn)return;
@@ -628,10 +630,11 @@ function startAuctionTimer(){
     render();
   }else{
     const last=auctionLastSubmitted;
-    if(!last)return uiAlert('Submit at least one bid before stopping the auction.');
+    if(!last){clearInterval(auctionTimer);uiConfirm('No bids submitted yet. Stop the auction and return to Start?',cancelAuctionRound,()=>{auctionTimer=setInterval(()=>{auctionSeconds++;const mm=Math.floor(auctionSeconds/60),ss=auctionSeconds%60;const el=document.getElementById('timer');if(el)el.textContent=String(mm).padStart(2,'0')+':'+String(ss).padStart(2,'0');},1000);});return;}
     auctionRunning=false; clearInterval(auctionTimer); auctionPendingWinner={...last}; render();
   }
 }
+
 function confirmAuctionWinner(){
   if(!auctionPendingWinner)return;
   const c=chitById(auctionGroupValue), last=auctionPendingWinner, m=state.members.find(x=>String(x.id)===String(last.memberId));
@@ -1441,6 +1444,48 @@ function exportPayoutsCSV(){
     else rows.push(['','',...base,0,'','',0,i.balance,i.status]);
   });
   downloadCSV(rows,'mithraq-prize-payouts.csv');
+}
+
+/* ===== Profit Dashboard: chit-wise commission income + monthly trend ===== */
+function auctionCommission(a){return Number(a.commissionAmt||0);}
+function profitTotals(){
+  const auctions=state.auctions||[];
+  const totalCommission=auctions.reduce((s,a)=>s+auctionCommission(a),0);
+  const totalDividend=auctions.reduce((s,a)=>s+Number(a.dividendPool||0),0);
+  const totalAuctionValue=auctions.reduce((s,a)=>s+Number(a.bid||0),0);
+  const thisMonth=dashboardMonth();
+  const thisMonthCommission=auctions.filter(a=>String(a.createdAt||a.date||'').slice(0,7)===thisMonth).reduce((s,a)=>s+auctionCommission(a),0);
+  return {totalCommission,totalDividend,totalAuctionValue,thisMonthCommission,count:auctions.length};
+}
+function profitByChit(){
+  return state.chits.map(c=>{
+    const rows=(state.auctions||[]).filter(a=>String(a.chitId)===String(c.id));
+    const commission=rows.reduce((s,a)=>s+auctionCommission(a),0);
+    const dividend=rows.reduce((s,a)=>s+Number(a.dividendPool||0),0);
+    return {c,rows,commission,dividend,count:rows.length};
+  }).filter(x=>x.count>0).sort((a,b)=>b.commission-a.commission);
+}
+function profitMonthlyTrend(){
+  const now=new Date(),out=[];
+  for(let i=5;i>=0;i--){
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1),ym=d.toISOString().slice(0,7);
+    const v=(state.auctions||[]).filter(a=>String(a.createdAt||a.date||'').slice(0,7)===ym).reduce((s,a)=>s+auctionCommission(a),0);
+    out.push({ym,label:d.toLocaleDateString('en-IN',{month:'short'}),value:v});
+  }
+  return out;
+}
+function exportProfitCSV(){
+  const rows=[['Chit','Auctions','Total Commission','Total Dividend Pool'],...profitByChit().map(x=>[x.c.name,x.count,x.commission,x.dividend])];
+  downloadCSV(rows,'mithraq-profit-dashboard.csv');
+}
+function profitDashboardPage(){
+  const t=profitTotals(),byChit=profitByChit(),trend=profitMonthlyTrend(),max=Math.max(1,...trend.map(x=>x.value));
+  const trendBars=trend.map(x=>`<div class="dash-bar-col"><div class="dash-bar-value">${x.value?money(x.value):'₹0'}</div><div class="dash-bar" style="height:${Math.max(8,(x.value/max)*120)}px"></div><small>${esc(x.label)}</small></div>`).join('');
+  const chitRows=byChit.map(x=>`<div class="analytics-row"><div class="analytics-icon">▣</div><div style="flex:1"><b>${esc(x.c.name)}</b><div class="muted">${x.count} auction(s) • Dividend pool ${money(x.dividend)}</div></div><strong>${money(x.commission)}</strong></div>`).join('');
+  return `<div class="row"><div><h2 class="page-title">Profit Dashboard</h2><div class="subtitle">Chit-wise commission income & monthly trend</div></div><button class="btn gold" onclick="exportProfitCSV()">⬇️ CSV</button></div>
+  <div class="grid analytics-kpis"><div class="card"><div class="stat-label">TOTAL COMMISSION</div><div class="stat-value">${money(t.totalCommission)}</div></div><div class="card"><div class="stat-label">THIS MONTH</div><div class="stat-value">${money(t.thisMonthCommission)}</div></div><div class="card"><div class="stat-label">TOTAL AUCTION VALUE</div><div class="stat-value">${money(t.totalAuctionValue)}</div></div><div class="card"><div class="stat-label">AUCTIONS RECORDED</div><div class="stat-value">${t.count}</div></div></div>
+  <div class="section"><h3>Commission Trend</h3><span class="muted">Last 6 months</span></div><div class="card dash-chart"><div class="dash-bars">${trendBars}</div></div>
+  <div class="section"><h3>Chit-wise Commission Income</h3><span class="muted">${byChit.length} group(s) with auction activity</span></div><div class="card analytics-list">${chitRows||'<div class="empty">No commission recorded yet. Set a commission % on your chits and record auctions to see income here.</div>'}</div>`;
 }
 
 
