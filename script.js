@@ -51,7 +51,9 @@ let state=(()=>{try{return JSON.parse(localStorage.getItem(KEY)||'null')||{chits
 if(!state.chits.length && !state.members.length){try{const old=JSON.parse(localStorage.getItem('mithraq_v1')||'null');if(old)state=old;}catch(e){}}
 state.chits=Array.isArray(state.chits)?state.chits:[]; state.members=Array.isArray(state.members)?state.members:[];
 state.auctions=Array.isArray(state.auctions)?state.auctions:[]; state.payments=Array.isArray(state.payments)?state.payments:[]; state.reminders=Array.isArray(state.reminders)?state.reminders:[]; state.activityLog=Array.isArray(state.activityLog)?state.activityLog:[]; state.notifications=Array.isArray(state.notifications)?state.notifications:[];
-let tab="home";
+const TAB_KEY='mithraq_last_tab_v1';
+let tab=(()=>{try{return sessionStorage.getItem(TAB_KEY)||"home";}catch(e){return "home";}})();
+let __navHistoryTab=null, __navPopping=false;
 let collectionMonthValue=new Date().toISOString().slice(0,7);
 function save(){localStorage.setItem(KEY,JSON.stringify(state));}
 async function pushToSupabase(){if(!supa||syncBusy)return false;syncBusy=true;try{const payload={id:"main",data:state,updated_at:new Date().toISOString()};const {error}=await supa.from("mithraq_data").upsert(payload,{onConflict:"id"});if(error)throw error;supaStatus="Synced";return true}catch(e){supaStatus="Sync error: "+(e.message||"unknown");return false}finally{syncBusy=false}}
@@ -105,6 +107,15 @@ function openNotifications(){tab='notifications';render();}
 function openActivityLog(){tab='activity';render();closeMenuSheet();}
 
 function money(n){return "₹"+Number(n||0).toLocaleString("en-IN",{maximumFractionDigits:2});}
+function openWhatsApp(url){
+  try{
+    const a=document.createElement('a');
+    a.href=url; a.target='_blank'; a.rel='noopener noreferrer';
+    document.body.appendChild(a); a.click(); a.remove();
+  }catch(e){
+    try{window.location.href=url;}catch(e2){}
+  }
+}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));}
 function chitById(id){return state.chits.find(c=>String(c.id)===String(id));}
 function membersForChit(id){return state.members.filter(m=>(m.chitIds||[]).map(String).includes(String(id)));}
@@ -129,10 +140,20 @@ function whatsappCenter(){
   return `<h2 class="page-title">WhatsApp Collection Center</h2><div class="subtitle">Send collection reminders and confirmations</div><div class="card" style="margin-top:14px;padding:14px"><input id="waSearch" placeholder="Search member / phone" value="${esc(q)}" oninput="renderWhatsAppRows()"><div id="waRows">${rows||'<div class="empty-state">No members found</div>'}</div></div><div class="card" style="margin-top:14px;padding:14px"><b>Message templates</b><p class="subtitle">Pending reminder • Payment received • Auction winner</p></div>`;
 }
 function renderWhatsAppRows(){const box=document.getElementById('waRows');if(!box)return;const q=(document.getElementById('waSearch')?.value||'').trim().toLowerCase();const members=Array.isArray(state.members)?state.members:[],payments=Array.isArray(state.payments)?state.payments:[];box.innerHTML=members.filter(m=>!q||[m.name,m.phone,m.memberNo].join(' ').toLowerCase().includes(q)).map(m=>{const paid=payments.filter(p=>String(p.memberId)===String(m.id)).reduce((a,p)=>a+Number(p.amount||0),0);return `<div class="card" style="margin:10px 0;padding:14px"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><div><b>${esc(m.name||'Member')}</b><div class="subtitle">#${esc(m.memberNo||'—')} • ${esc(m.phone||'No phone')}</div><div class="subtitle">Recorded payments: ₹${paid.toLocaleString('en-IN')}</div></div><button class="btn primary" onclick="sendWA(${JSON.stringify(String(m.phone||''))},${JSON.stringify(String(m.name||'Member'))},${paid})">WhatsApp</button></div></div>`}).join('')||'<div class="empty-state">No members found</div>';}
-function sendWA(phone,name,paid){const digits=String(phone||'').replace(/\D/g,'');if(!digits){alert('Member phone number is missing.');return;}const msg=`Hello ${name}, this is a MithraQ collection reminder. Recorded payment total: ₹${Number(paid||0).toLocaleString('en-IN')}. Please contact us for the current pending amount. Thank you.`;const url=`https://wa.me/${digits.startsWith('91')?digits:'91'+digits}?text=${encodeURIComponent(msg)}`;window.open(url,'_blank');}
+function sendWA(phone,name,paid){const digits=String(phone||'').replace(/\D/g,'');if(!digits){alert('Member phone number is missing.');return;}const msg=`Hello ${name}, this is a MithraQ collection reminder. Recorded payment total: ₹${Number(paid||0).toLocaleString('en-IN')}. Please contact us for the current pending amount. Thank you.`;const url=`https://wa.me/${digits.startsWith('91')?digits:'91'+digits}?text=${encodeURIComponent(msg)}`;openWhatsApp(url);}
 function render(){
   const app=document.getElementById("app");
   if(!app)return;
+  try{sessionStorage.setItem(TAB_KEY,tab);}catch(e){}
+  if(tab!==__navHistoryTab){
+    if(!__navPopping){
+      try{
+        if(__navHistoryTab===null)history.replaceState({mithraqTab:tab},'',location.href);
+        else history.pushState({mithraqTab:tab},'',location.href);
+      }catch(e){}
+    }
+    __navHistoryTab=tab;
+  }
   try{
     let html="";
     if(tab==='home')html=home();
@@ -275,14 +296,14 @@ function memberStatement(memberId){
   <button class="btn gold full" onclick="printMemberStatement('${String(memberId)}')">🖨️ Print Statement</button></div>`);
 }
 function printReceipt(paymentId){const p=state.payments.find(x=>String(x.id)===String(paymentId));if(!p)return;const m=state.members.find(x=>String(x.id)===String(p.memberId));const c=chitById(p.chitId);const w=window.open('','_blank','width=520,height=720');if(!w){uiAlert('Please allow pop-ups to print.');return;}w.document.write(`<html><head><title>${receiptNo(p)} - MithraQ</title><style>body{font-family:Arial;padding:28px;color:#24463d;max-width:460px;margin:auto}h1{color:#056b4f;margin-bottom:4px}.box{border:1px solid #ddd;border-radius:12px;padding:14px;margin:15px 0}.r{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #eee}.total{font-size:24px;font-weight:800;color:#056b4f;margin-top:15px}button{padding:10px 15px;border:0;border-radius:9px;background:#056b4f;color:white}@media print{button{display:none}}</style></head><body><h1>MithraQ</h1><div>Payment Receipt</div><div class="box"><div class="r"><span>Receipt</span><b>${receiptNo(p)}</b></div><div class="r"><span>Member</span><b>${esc(m?.name||p.member||'')}</b></div><div class="r"><span>Chit</span><b>${esc(c?.name||p.chit||'')}</b></div><div class="r"><span>Month</span><b>${esc(p.month||'')}</b></div><div class="r"><span>Date</span><b>${esc(p.date||'')}</b></div><div class="r"><span>Mode</span><b>${esc(p.mode||'')}</b></div><div class="total">Paid: ${money(p.amount)}</div></div><button onclick="window.print()">Print Receipt</button></body></html>`);w.document.close();}
-function whatsappPaymentReceipt(paymentId){const p=state.payments.find(x=>String(x.id)===String(paymentId));if(!p)return;const m=state.members.find(x=>String(x.id)===String(p.memberId));if(!m?.phone)return uiAlert('Member phone number is missing.');const phone=String(m.phone).replace(/\D/g,'');const intl=phone.length===10?'91'+phone:phone;const text=`MithraQ Payment Receipt\n\nReceipt: ${receiptNo(p)}\nMember: ${m.name}\nChit: ${p.chit}\nMonth: ${p.month}\nAmount Paid: ${money(p.amount)}\nDate: ${p.date}\nMode: ${p.mode}`;window.open('https://wa.me/'+intl+'?text='+encodeURIComponent(text),'_blank');}
+function whatsappPaymentReceipt(paymentId){const p=state.payments.find(x=>String(x.id)===String(paymentId));if(!p)return;const m=state.members.find(x=>String(x.id)===String(p.memberId));if(!m?.phone)return uiAlert('Member phone number is missing.');const phone=String(m.phone).replace(/\D/g,'');const intl=phone.length===10?'91'+phone:phone;const text=`MithraQ Payment Receipt\n\nReceipt: ${receiptNo(p)}\nMember: ${m.name}\nChit: ${p.chit}\nMonth: ${p.month}\nAmount Paid: ${money(p.amount)}\nDate: ${p.date}\nMode: ${p.mode}`;openWhatsApp('https://wa.me/'+intl+'?text='+encodeURIComponent(text));}
 function whatsappPaymentReminder(memberId,chitId){
   const m=state.members.find(x=>String(x.id)===String(memberId)),c=chitById(chitId); if(!m||!c)return;
   const month=collectionMonthValue||new Date().toISOString().slice(0,7),p=paymentFor(memberId,month); if(p){uiAlert('This member is already marked as paid for '+month+'.');return;}
   if(!m.phone){uiAlert('This member does not have a phone number.');return;}
   const phone=String(m.phone).replace(/\D/g,''); const intl=phone.length===10?'91'+phone:phone;
   const text=`MithraQ Payment Reminder\n\nDear ${m.name},\nMonthly chit payment for ${c.name} (${month}) is pending.\nAmount: ${money(m.monthly||c.monthly||0)}\n\nPlease make the payment at your earliest convenience. Thank you.`;
-  window.open('https://wa.me/'+intl+'?text='+encodeURIComponent(text),'_blank');
+  openWhatsApp('https://wa.me/'+intl+'?text='+encodeURIComponent(text));
 }
 function printMemberStatement(memberId){
   const m=state.members.find(x=>String(x.id)===String(memberId));if(!m)return;const ps=memberPayments(memberId),total=ps.reduce((s,p)=>s+Number(p.amount||0),0);
@@ -342,7 +363,7 @@ function expectedForMonth(month){return state.members.reduce((sum,m)=>{const c=(
 function paymentsForMonth(month){return state.payments.filter(p=>String(p.month||'')===String(month));}
 function monthCollected(month){return paymentsForMonth(month).reduce((s,p)=>s+Number(p.amount||0),0);}
 function pendingRows(month){return state.members.map(m=>{const c=(m.chitIds||[]).map(chitById).find(Boolean);if(!c)return null;const expected=memberMonthly(m,c),p=paymentFor(m.id,month),paid=Number(p?.amount||0),balance=Math.max(0,expected-paid);if(balance<=0)return null;return {m,c,p,expected,paid,balance};}).filter(Boolean);}
-function whatsappPendingMember(memberId,chitId,month=reportMonthValue){const m=state.members.find(x=>String(x.id)===String(memberId)),c=chitById(chitId);if(!m||!c)return;if(!m.phone)return uiAlert('Phone number is missing for '+(m.name||'this member')+'.');const p=paymentFor(memberId,month),expected=memberMonthly(m,c),paid=Number(p?.amount||0),balance=Math.max(0,expected-paid);if(balance<=0)return uiAlert('No pending balance for '+m.name+'.');const phone=String(m.phone).replace(/\D/g,'');const intl=phone.length===10?'91'+phone:phone;const text=`MithraQ Payment Reminder\n\nDear ${m.name},\nYour ${c.name} chit payment for ${monthLabel(month)} is pending.\nExpected: ${money(expected)}\nPaid: ${money(paid)}\nPending: ${money(balance)}\n\nPlease make the pending payment at your earliest convenience. Thank you.`;window.open('https://wa.me/'+intl+'?text='+encodeURIComponent(text),'_blank');}
+function whatsappPendingMember(memberId,chitId,month=reportMonthValue){const m=state.members.find(x=>String(x.id)===String(memberId)),c=chitById(chitId);if(!m||!c)return;if(!m.phone)return uiAlert('Phone number is missing for '+(m.name||'this member')+'.');const p=paymentFor(memberId,month),expected=memberMonthly(m,c),paid=Number(p?.amount||0),balance=Math.max(0,expected-paid);if(balance<=0)return uiAlert('No pending balance for '+m.name+'.');const phone=String(m.phone).replace(/\D/g,'');const intl=phone.length===10?'91'+phone:phone;const text=`MithraQ Payment Reminder\n\nDear ${m.name},\nYour ${c.name} chit payment for ${monthLabel(month)} is pending.\nExpected: ${money(expected)}\nPaid: ${money(paid)}\nPending: ${money(balance)}\n\nPlease make the pending payment at your earliest convenience. Thank you.`;openWhatsApp('https://wa.me/'+intl+'?text='+encodeURIComponent(text));}
 function whatsappAllPending(month=reportMonthValue){const rows=pendingRows(month);if(!rows.length)return uiAlert('No pending members for '+monthLabel(month)+'.');const valid=rows.filter(x=>x.m.phone);if(!valid.length)return uiAlert('No pending member has a phone number.');uiConfirm(`Send WhatsApp reminders to ${valid.length} pending member(s)?`,()=>{valid.forEach((x,i)=>setTimeout(()=>whatsappPendingMember(x.m.id,x.c.id,month),i*700));});}
 function setReportMonth(v){if(!v)return;reportMonthValue=v;render();}
 function dailyReport(month){const ps=paymentsForMonth(month);const byDay={};ps.forEach(p=>{const d=p.date||month+'-01';byDay[d]=(byDay[d]||0)+Number(p.amount||0);});return Object.entries(byDay).sort((a,b)=>b[0].localeCompare(a[0])).slice(0,31);}
@@ -385,7 +406,7 @@ function reminderKey(memberId,chitId,month){return String(memberId)+'|'+String(c
 function reminderFor(memberId,chitId,month){return state.reminders.find(r=>r.key===reminderKey(memberId,chitId,month));}
 function markReminderSent(memberId,chitId,month){const m=state.members.find(x=>String(x.id)===String(memberId)),c=chitById(chitId);if(!m||!c)return;const key=reminderKey(memberId,chitId,month),now=new Date().toISOString(),old=state.reminders.find(r=>r.key===key);if(old){old.sentAt=now;old.count=Number(old.count||0)+1;}else state.reminders.push({key,memberId:String(memberId),chitId:String(chitId),month,sentAt:now,count:1});logActivity('Reminder sent','System',`${m.name} • ${c.name} • ${monthLabel(month)}`);render();}
 function reminderRows(month){return state.members.flatMap(m=>(m.chitIds||[]).map(id=>{const c=chitById(id);if(!c)return null;const expected=memberMonthly(m,c),p=paymentFor(m.id,month),paid=Number(p?.amount||0),balance=Math.max(0,expected-paid);if(balance<=0)return null;return {m,c,expected,paid,balance,reminder:reminderFor(m.id,c.id,month)};}).filter(Boolean));}
-function sendReminderAndMark(memberId,chitId,month){const m=state.members.find(x=>String(x.id)===String(memberId)),c=chitById(chitId);if(!m||!c)return;if(!m.phone)return uiAlert('This member does not have a phone number.');const p=paymentFor(memberId,month),expected=memberMonthly(m,c),paid=Number(p?.amount||0),balance=Math.max(0,expected-paid);if(balance<=0)return uiAlert('No pending balance for '+m.name+'.');const phone=String(m.phone).replace(/\D/g,''),intl=phone.length===10?'91'+phone:phone;const text=`MithraQ Payment Reminder\n\nDear ${m.name},\nYour ${c.name} chit payment for ${monthLabel(month)} is pending.\nExpected: ${money(expected)}\nPaid: ${money(paid)}\nPending: ${money(balance)}\n\nPlease make the pending payment at your earliest convenience. Thank you.`;window.open('https://wa.me/'+intl+'?text='+encodeURIComponent(text),'_blank');markReminderSent(memberId,chitId,month);}
+function sendReminderAndMark(memberId,chitId,month){const m=state.members.find(x=>String(x.id)===String(memberId)),c=chitById(chitId);if(!m||!c)return;if(!m.phone)return uiAlert('This member does not have a phone number.');const p=paymentFor(memberId,month),expected=memberMonthly(m,c),paid=Number(p?.amount||0),balance=Math.max(0,expected-paid);if(balance<=0)return uiAlert('No pending balance for '+m.name+'.');const phone=String(m.phone).replace(/\D/g,''),intl=phone.length===10?'91'+phone:phone;const text=`MithraQ Payment Reminder\n\nDear ${m.name},\nYour ${c.name} chit payment for ${monthLabel(month)} is pending.\nExpected: ${money(expected)}\nPaid: ${money(paid)}\nPending: ${money(balance)}\n\nPlease make the pending payment at your earliest convenience. Thank you.`;openWhatsApp('https://wa.me/'+intl+'?text='+encodeURIComponent(text));markReminderSent(memberId,chitId,month);}
 function reminderSearch(){const month=document.getElementById('reminderMonth')?.value||reportMonthValue,q=(document.getElementById('reminderSearch')?.value||'').trim().toLowerCase(),filter=document.getElementById('reminderFilter')?.value||'all',el=document.getElementById('reminderRows');if(!el)return;let rows=reminderRows(month).filter(x=>{const hay=[x.m.name,x.m.phone,x.m.memberNo,x.c.name].join(' ').toLowerCase();return !q||hay.includes(q);});if(filter==='pending')rows=rows.filter(x=>!x.reminder);if(filter==='reminded')rows=rows.filter(x=>!!x.reminder);if(filter==='no-phone')rows=rows.filter(x=>!x.m.phone);const summary=document.getElementById('reminderSummary');if(summary){const all=reminderRows(month),sent=all.filter(x=>x.reminder).length;summary.innerHTML=`<span>${all.length} pending</span><span>${sent} reminded</span><span>${all.length-sent} not reminded</span>`;}el.innerHTML=rows.length?rows.map(x=>`<div class="card reminder-row"><div class="avatar">${esc((x.m.name||'?')[0]).toUpperCase()}</div><div class="reminder-main"><b>${esc(x.m.name)}</b><div class="muted">${esc(x.c.name)} • ${esc(x.m.phone||'No phone')}</div><div class="reminder-money">Pending ${money(x.balance)} <small>• Expected ${money(x.expected)} • Paid ${money(x.paid)}</small></div>${x.reminder?`<div class="reminder-sent">✓ Reminded ${esc(new Date(x.reminder.sentAt).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}))} • ${Number(x.reminder.count||1)} time(s)</div>`:''}</div><div class="reminder-actions">${x.m.phone?`<button class="action-btn" onclick="sendReminderAndMark('${String(x.m.id)}','${String(x.c.id)}','${month}')">💬 ${x.reminder?'Remind Again':'WhatsApp'}</button>`:'<span class="badge pending">NO PHONE</span>'}<button class="action-btn collect" onclick="collectionMonthValue='${month}';collectMember('${String(x.m.id)}','${String(x.c.id)}')">₹ Collect</button><button class="action-btn" onclick="member360('${String(x.m.id)}')">👤</button></div></div>`).join(''):'<div class="empty">🎉 No matching pending reminders.</div>';}
 function reminderSetMonth(v){if(!v)return;reportMonthValue=v;reminderSearch();}
 function reminderCenter(){const month=reportMonthValue,all=reminderRows(month),sent=all.filter(x=>x.reminder).length;return `<div class="row"><div><h2 class="page-title">Reminders</h2><div class="subtitle">Track pending member payments and WhatsApp reminders</div></div><input id="reminderMonth" class="month-picker" type="month" value="${month}" onchange="reminderSetMonth(this.value)"></div><div class="grid reminder-stats"><div class="card"><div class="stat-label">PENDING</div><div class="stat-value">${all.length}</div></div><div class="card"><div class="stat-label">PENDING AMOUNT</div><div class="stat-value">${money(all.reduce((s,x)=>s+x.balance,0))}</div></div><div class="card"><div class="stat-label">REMINDED</div><div class="stat-value">${sent}</div></div><div class="card"><div class="stat-label">NOT REMINDED</div><div class="stat-value">${all.length-sent}</div></div></div><div class="reminder-toolbar"><input id="reminderSearch" placeholder="Search member, phone or chit..." oninput="reminderSearch()"><select id="reminderFilter" onchange="reminderSearch()"><option value="all">All Pending</option><option value="pending">Not Reminded</option><option value="reminded">Reminded</option><option value="no-phone">No Phone</option></select></div><div id="reminderSummary" class="reminder-summary"><span>${all.length} pending</span><span>${sent} reminded</span><span>${all.length-sent} not reminded</span></div><div class="row reminder-tools"><button class="btn gold" onclick="remindAllCenter('${month}')">💬 Remind All</button><button class="btn" onclick="exportReminderCSV('${month}')">⬇️ CSV</button></div><div id="reminderRows" class="list reminder-list">${all.length?all.map(x=>`<div class="card reminder-row"><div class="avatar">${esc((x.m.name||'?')[0]).toUpperCase()}</div><div class="reminder-main"><b>${esc(x.m.name)}</b><div class="muted">${esc(x.c.name)} • ${esc(x.m.phone||'No phone')}</div><div class="reminder-money">Pending ${money(x.balance)} <small>• Expected ${money(x.expected)} • Paid ${money(x.paid)}</small></div>${x.reminder?`<div class="reminder-sent">✓ Reminded ${esc(new Date(x.reminder.sentAt).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}))} • ${Number(x.reminder.count||1)} time(s)</div>`:''}</div><div class="reminder-actions">${x.m.phone?`<button class="action-btn" onclick="sendReminderAndMark('${String(x.m.id)}','${String(x.c.id)}','${month}')">💬 ${x.reminder?'Remind Again':'WhatsApp'}</button>`:'<span class="badge pending">NO PHONE</span>'}<button class="action-btn collect" onclick="collectionMonthValue='${month}';collectMember('${String(x.m.id)}','${String(x.c.id)}')">₹ Collect</button><button class="action-btn" onclick="member360('${String(x.m.id)}')">👤</button></div></div>`).join(''):'<div class="empty">🎉 No pending payments for this month.</div>'}</div>`;}
@@ -526,7 +547,7 @@ function deleteAuction(id){const a=state.auctions.find(x=>String(x.id)===String(
 function confirmDeleteAuction(id){state.auctions=state.auctions.filter(a=>String(a.id)!==String(id));save();closeModal();render();}
 function exportAuctionCSV(chitId){const rows=[['Date','Round','Winner','Member No','Bid','Chit Amount','Discount','Dividend/Member','Payable','Payment Status','Due Date'],...state.auctions.filter(a=>String(a.chitId)===String(chitId)).map(a=>{const m=state.members.find(x=>String(x.id)===String(a.memberId));return[a.date,a.round||'Round 1',a.member||'',m?.memberNo||'',a.bid,a.chitAmount,a.auctionDiscount,a.dividendPerMember,a.payable,a.paymentStatus||'Pending',a.dueDate||''];})];downloadCSV(rows,'mithraq-auction-history.csv');}
 function printAuctionReceipt(id){const a=state.auctions.find(x=>String(x.id)===String(id));if(!a)return;const c=chitById(a.chitId);const bid=Number(a.bid||0);const hasStored=a.dividendPerMember!=null&&a.payable!=null;const fin=hasStored?{dividendPerMember:Number(a.dividendPerMember||0),payable:Number(a.payable||0)}:auctionFinance(c||{amount:a.chitAmount},bid);const m=state.members.find(x=>String(x.id)===String(a.memberId));const w=window.open('','_blank','width=520,height=720');if(!w){uiAlert('Please allow pop-ups to print.');return;}w.document.write(`<html><head><title>Auction Receipt - MithraQ</title><style>body{font-family:Arial;padding:28px;color:#24463d;max-width:460px;margin:auto}h1{color:#056b4f}.box{border:1px solid #ddd;border-radius:14px;padding:16px;margin-top:18px}.r{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #eee}.total{font-size:22px;font-weight:800;color:#056b4f;margin-top:15px}button{padding:10px 15px;border:0;border-radius:9px;background:#056b4f;color:white}@media print{button{display:none}}</style></head><body><h1>MithraQ</h1><div>Auction Winner Receipt</div><div class="box"><div class="r"><span>Group</span><b>${esc(a.chit)}</b></div><div class="r"><span>Chit No</span><b>#${esc(m?.memberNo||'—')}</b></div><div class="r"><span>Winner</span><b>${esc(a.member)}</b></div><div class="r"><span>Round</span><b>${esc(a.round||'Round 1')}</b></div><div class="r"><span>Date</span><b>${esc(a.date||'')}</b></div><div class="r"><span>Chit Amount</span><b>${money(a.chitAmount)}</b></div><div class="r"><span>Auction</span><b>${money(a.bid)}</b></div><div class="r"><span>Divi.</span><b>${money(fin.dividendPerMember)}</b></div><div class="r"><span>Due Date</span><b>${formatDMY(a.dueDate)}</b></div><div class="total">Payable: ${money(fin.payable)}</div></div><button onclick="window.print()">Print Receipt</button></body></html>`);w.document.close();}
-function whatsappAuctionResult(id){const a=state.auctions.find(x=>String(x.id)===String(id));if(!a)return;const c=chitById(a.chitId);const bid=Number(a.bid||0);const hasStored=a.dividendPerMember!=null&&a.payable!=null;const fin=hasStored?{dividendPerMember:Number(a.dividendPerMember||0),payable:Number(a.payable||0)}:auctionFinance(c||{amount:a.chitAmount},bid);const m=state.members.find(x=>String(x.id)===String(a.memberId));if(!m?.phone)return uiAlert('Winner phone number is missing.');const phone=String(m.phone).replace(/\D/g,'');const intl=phone.length===10?'91'+phone:phone;const text=`MithraQ Auction Result\n\nGroup: ${a.chit}\nChit No: #${m?.memberNo||'—'}\nWinner: ${a.member}\nRound: ${a.round||'Round 1'}\nChit Amount: ${money(a.chitAmount)}\nAuction: ${money(a.bid)}\nDivi.: ${money(fin.dividendPerMember)}\nPayable: ${money(fin.payable)}\nDue Date: ${formatDMY(a.dueDate)}\nDate: ${a.date}`;window.open('https://wa.me/'+intl+'?text='+encodeURIComponent(text),'_blank');}
+function whatsappAuctionResult(id){const a=state.auctions.find(x=>String(x.id)===String(id));if(!a)return;const c=chitById(a.chitId);const bid=Number(a.bid||0);const hasStored=a.dividendPerMember!=null&&a.payable!=null;const fin=hasStored?{dividendPerMember:Number(a.dividendPerMember||0),payable:Number(a.payable||0)}:auctionFinance(c||{amount:a.chitAmount},bid);const m=state.members.find(x=>String(x.id)===String(a.memberId));if(!m?.phone)return uiAlert('Winner phone number is missing.');const phone=String(m.phone).replace(/\D/g,'');const intl=phone.length===10?'91'+phone:phone;const text=`MithraQ Auction Result\n\nGroup: ${a.chit}\nChit No: #${m?.memberNo||'—'}\nWinner: ${a.member}\nRound: ${a.round||'Round 1'}\nChit Amount: ${money(a.chitAmount)}\nAuction: ${money(a.bid)}\nDivi.: ${money(fin.dividendPerMember)}\nPayable: ${money(fin.payable)}\nDue Date: ${formatDMY(a.dueDate)}\nDate: ${a.date}`;openWhatsApp('https://wa.me/'+intl+'?text='+encodeURIComponent(text));}
 
 /* ===== MithraQ Professional Phase 8: Member 360 Profile ===== */
 function member360(memberId){
@@ -550,7 +571,7 @@ function member360(memberId){
     <div class="profile-history">${auc.length?auc.map(a=>`<div class="profile-row"><div><b>${esc(a.chit||'')}</b><div class="muted">${esc(a.round||'')} • ${esc(a.date||'')}</div></div><div class="profile-row-right"><strong>${money(a.bid)}</strong><span class="muted">Dividend ${money(Math.max(0,Number(a.chitAmount||0)-Number(a.bid||0)))}</span></div></div>`).join(''):'<div class="empty">No auction records.</div>'}</div>
   </div>`);
 }
-function whatsappMember(memberId){const m=state.members.find(x=>String(x.id)===String(memberId));if(!m?.phone)return uiAlert('Member phone number is missing.');const phone=String(m.phone).replace(/\D/g,'');const intl=phone.length===10?'91'+phone:phone;const text=`MithraQ Member Profile\n\nMember: ${m.name}\nMember ID: ${m.memberNo||'—'}\nPhone: ${m.phone}\n\nThank you.`;window.open('https://wa.me/'+intl+'?text='+encodeURIComponent(text),'_blank');}
+function whatsappMember(memberId){const m=state.members.find(x=>String(x.id)===String(memberId));if(!m?.phone)return uiAlert('Member phone number is missing.');const phone=String(m.phone).replace(/\D/g,'');const intl=phone.length===10?'91'+phone:phone;const text=`MithraQ Member Profile\n\nMember: ${m.name}\nMember ID: ${m.memberNo||'—'}\nPhone: ${m.phone}\n\nThank you.`;openWhatsApp('https://wa.me/'+intl+'?text='+encodeURIComponent(text));}
 function groupMemberPanel(id){
   const c=chitById(id); if(!c)return '<div class="empty">Chit group not found.</div>';
   const list=membersForChit(id),month=new Date().toISOString().slice(0,7);
@@ -730,6 +751,7 @@ const _backupSettings=settingsPanel; settingsPanel=function(){return _backupSett
 
 /* ===== MithraQ Secure Admin & App Lock 2.0 ===== */
 const PIN_KEY='mithraq_admin_pin_v2';
+const SESSION_UNLOCK_KEY='mithraq_session_unlocked_v1';
 const LOCK_MINUTES=5;
 let pinUnlocked=false, lockTimer=null;
 async function pinHash(text){return authHash(text)}
@@ -748,11 +770,11 @@ async function submitPin(mode){
     if(p!==c){err.textContent='PINs do not match.';return}
     localStorage.setItem(PIN_KEY,JSON.stringify({hash:await pinHash(p),updatedAt:new Date().toISOString()}));
   }else{const saved=getPin();if(!saved||await pinHash(p)!==saved.hash){err.textContent='Incorrect PIN.';return}}
-  pinUnlocked=true;secureLayer().className='pin-screen hidden';startAutoLock();render();
+  pinUnlocked=true;secureLayer().className='pin-screen hidden';try{sessionStorage.setItem(SESSION_UNLOCK_KEY,'1');}catch(e){}startAutoLock();render();
 }
 function startAutoLock(){clearTimeout(lockTimer);lockTimer=setTimeout(()=>lockApp(),LOCK_MINUTES*60*1000)}
 function touchAutoLock(){if(pinUnlocked)startAutoLock()}
-function lockApp(){if(!authUser)return;pinUnlocked=false;clearTimeout(lockTimer);pinScreen('lock')}
+function lockApp(){if(!authUser)return;pinUnlocked=false;try{sessionStorage.removeItem(SESSION_UNLOCK_KEY);}catch(e){}clearTimeout(lockTimer);pinScreen('lock')}
 function pinForgot(){uiAlert('For security, reset the PIN by logging out and recreating the local admin account. Your stored app data is kept separately.','PIN Help')}
 function changeAdminPin(){
   if(!authUser||!pinUnlocked)return;
@@ -763,9 +785,29 @@ function securitySettingsCard(){return `<div class="card security-card"><div><h3
 const _oldRenderSettings=settingsPanel;
 settingsPanel=function(){return _oldRenderSettings()+securitySettingsCard()};
 const _oldShowApp=showApp;
-showApp=function(){document.querySelector('.app').classList.remove('locked');document.body.classList.remove('auth-mode');document.getElementById('authRoot').innerHTML='';const p=getPin();if(!p){pinUnlocked=false;pinScreen('setup');return}pinUnlocked=false;pinScreen('lock')}
+showApp=function(){
+  document.querySelector('.app').classList.remove('locked');document.body.classList.remove('auth-mode');document.getElementById('authRoot').innerHTML='';
+  const p=getPin();
+  if(!p){pinUnlocked=false;pinScreen('setup');return}
+  let alreadyUnlocked=false; try{alreadyUnlocked=sessionStorage.getItem(SESSION_UNLOCK_KEY)==='1';}catch(e){}
+  if(alreadyUnlocked){
+    // Same browser session (e.g. a page refresh) — stay unlocked instead of asking for the PIN again.
+    pinUnlocked=true;const pr=document.getElementById('pinRoot');if(pr)pr.className='pin-screen hidden';startAutoLock();render();return;
+  }
+  pinUnlocked=false;pinScreen('lock');
+}
 const _oldShowLogin=showLogin;
-showLogin=function(){authUser=null;pinUnlocked=false;clearTimeout(lockTimer);const pr=document.getElementById('pinRoot');if(pr)pr.remove();_oldShowLogin()}
+showLogin=function(){authUser=null;pinUnlocked=false;try{sessionStorage.removeItem(SESSION_UNLOCK_KEY);}catch(e){}clearTimeout(lockTimer);const pr=document.getElementById('pinRoot');if(pr)pr.remove();_oldShowLogin()}
 const _oldRender=render;
 render=function(){if(!pinUnlocked)return;_oldRender()}
 document.addEventListener('click',touchAutoLock,{passive:true});document.addEventListener('keydown',touchAutoLock,{passive:true});
+window.addEventListener('popstate',(e)=>{
+  const st=e.state;
+  if(st&&st.mithraqTab&&pinUnlocked){
+    __navPopping=true;
+    tab=st.mithraqTab;
+    __navHistoryTab=tab;
+    render();
+    __navPopping=false;
+  }
+});
