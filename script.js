@@ -1222,13 +1222,13 @@ function openPrizePayout(id){
   const i=prizeInfo(a);
   const hist=i.payouts.length?[...i.payouts].reverse().map(p=>`<div class="prize-hist"><div style="flex:1"><b>${money(p.amount)}</b><div class="muted">${formatDMY(p.date)} • ${esc(p.mode||'')}${p.voucherNo?' • '+esc(p.voucherNo):''}${p.note?' • '+esc(p.note):''}</div></div>${p.voucherNo?`<button class="mini-btn" title="Print voucher" onclick="printPrizeVoucher('${String(a.id)}','${String(p.id)}')">🧾</button><button class="mini-btn" title="PDF voucher" onclick="pdfPrizeVoucher('${String(a.id)}','${String(p.id)}')">📄</button><button class="mini-btn" title="Share on WhatsApp" onclick="whatsappPrizePayout('${String(a.id)}','${String(p.id)}')">💬</button>`:''}<button class="mini-btn danger-mini" title="Delete payout" onclick="deletePrizePayout('${String(a.id)}','${String(p.id)}')">⌫</button></div>`).join(''):'<div class="muted">No payouts recorded yet.</div>';
   openModal('Prize Payout',`<div class="payment-person"><div class="avatar">${esc((a.member||'?')[0]).toUpperCase()}</div><div><b>${esc(a.member||'Winner')}</b><div class="muted">${esc(a.chit||'')} • ${esc(a.round||'Round 1')} • Bid ${money(a.bid)}</div></div></div>
-  <div class="prize-grid" style="margin:12px 0"><div><span>PRIZE</span><b>${money(i.due)}</b></div><div><span>PAID</span><b>${money(i.paid)}</b></div><div><span>BALANCE</span><b>${money(i.balance)}</b></div></div>
+  <div class="prize-grid" style="margin:12px 0"><div><span>PRIZE</span><b id="ppPrize">${money(i.due)}</b></div><div><span>PAID</span><b id="ppPaid">${money(i.paid)}</b></div><div><span>BALANCE</span><b id="ppBal">${money(i.balance)}</b></div></div>
   <div class="form">
     <label class="field-label">Deduction ₹ (pending dues etc.) — optional</label>
-    <input id="ppDeduct" type="number" min="0" value="${i.deduction||''}" placeholder="0">
+    <input id="ppDeduct" type="number" min="0" value="${i.deduction||''}" placeholder="0" oninput="prizeDeductChanged('${String(a.id)}')">
     <input id="ppDeductNote" placeholder="Deduction reason (optional)" value="${esc(a.prizeDeductionNote||'')}">
     <label class="field-label">Amount paying now ₹</label>
-    <input id="ppAmount" type="number" min="0" value="${i.balance>0.005?Math.round(i.balance*100)/100:''}" placeholder="Amount">
+    <input id="ppAmount" type="number" min="0" value="${i.balance>0.005?Math.round(i.balance*100)/100:''}" placeholder="Amount" oninput="this.dataset.touched='1'">
     <label class="field-label">Payment date</label>
     <input id="ppDate" type="date" value="${localISODate()}">
     <label class="field-label">Mode</label>
@@ -1239,17 +1239,30 @@ function openPrizePayout(id){
   </div>
   <div class="section"><h3>Payout History</h3><span class="muted">${i.payouts.length} record(s)</span></div>${hist}`);
 }
+function prizeDeductChanged(id){
+  const a=findAuction(id);if(!a)return;
+  const cur=prizeInfo(a);
+  const ded=Math.min(cur.gross,Math.max(0,Number(document.getElementById('ppDeduct')?.value||0)));
+  const due=cur.gross-ded,bal=Math.max(0,due-cur.paid);
+  const set=(i,t)=>{const e=document.getElementById(i);if(e)e.textContent=t;};
+  set('ppPrize',money(due));set('ppBal',money(bal));
+  const amt=document.getElementById('ppAmount');
+  if(amt&&!(amt.dataset&&amt.dataset.touched))amt.value=bal>0.005?Math.round(bal*100)/100:'';
+}
 function savePrizePayout(id){
   const a=findAuction(id);if(!a)return;
   const cur=prizeInfo(a);
   const ded=Math.max(0,Number(document.getElementById('ppDeduct')?.value||0));
   const dedNote=(document.getElementById('ppDeductNote')?.value||'').trim();
-  const amt=Number(document.getElementById('ppAmount')?.value||0);
+  const amtEl=document.getElementById('ppAmount');
+  let amt=Number(amtEl?.value||0);
   const date=document.getElementById('ppDate')?.value||'';
   const mode=document.getElementById('ppMode')?.value||'Cash';
   const note=(document.getElementById('ppNote')?.value||'').trim();
   if(ded>cur.gross)return uiAlert('Deduction cannot be more than the prize amount ('+money(cur.gross)+').');
   const balance=Math.max(0,cur.gross-ded-cur.paid);
+  const amtTouched=!!(amtEl&&amtEl.dataset&&amtEl.dataset.touched);
+  if(!amtTouched&&amt>balance)amt=Math.round(balance*100)/100; /* auto-filled amount follows the new balance after a deduction */
   if(amt>0){
     if(!date)return uiAlert('Select the payment date.');
     if(amt>balance+0.005)return uiAlert('Amount is more than the balance to pay ('+money(balance)+').');
