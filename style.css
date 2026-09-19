@@ -13,7 +13,7 @@
 .nav-menu-circle{width:62px;height:62px;border-radius:50%;background:linear-gradient(145deg,#0ba579,#045c43);color:#fff;font-size:22px;display:grid;place-items:center;box-shadow:0 14px 26px rgba(4,74,54,.35),0 0 0 6px #fff}
 .nav-menu .menu-label{color:var(--green)}
 .nav-menu.active .nav-menu-circle{background:linear-gradient(145deg,var(--gold2),var(--gold));box-shadow:0 14px 26px rgba(214,162,31,.4),0 0 0 6px #fff}
-@media(min-width:700px){.bottom-nav{position:absolute;bottom:14px}}
+@media(min-width:700px){.bottom-nav{position:fixed;bottom:14px;left:50%;transform:translateX(-50%)}}
 /* Menu bottom sheet */
 .menu-sheet{position:fixed;inset:0;background:rgba(9,45,37,.32);backdrop-filter:blur(6px);display:flex;align-items:flex-end;justify-content:center;z-index:35;padding:0}
 .menu-sheet.hidden{display:none}
@@ -445,115 +445,16 @@ body::before{
 }
 
 
-/* ===== MithraQ Money Rain — Sample 1 =====
-   Decorative only: subtle floating rupee/coin particles behind the UI. */
-.money-rain{
-  position:absolute;
-  inset:0;
-  z-index:0;
-  overflow:hidden;
-  pointer-events:none;
-  opacity:.48;
-  -webkit-mask-image:linear-gradient(to bottom,transparent 0%,#000 8%,#000 88%,transparent 100%);
-  mask-image:linear-gradient(to bottom,transparent 0%,#000 8%,#000 88%,transparent 100%);
-}
-.money-rain .money-particle{
-  position:absolute;
-  top:-48px;
-  left:var(--x);
-  width:var(--size);
-  height:var(--size);
-  display:grid;
-  place-items:center;
-  color:var(--particle-color,#b68a1a);
-  font-size:calc(var(--size) * .58);
-  font-weight:900;
-  line-height:1;
-  opacity:var(--opacity,.2);
-  filter:drop-shadow(0 3px 5px rgba(3,74,55,.08));
-  transform:rotate(var(--rotate));
-  animation:moneyFall var(--duration) linear var(--delay) infinite;
-}
-.money-rain .money-particle.coin{
-  border:1px solid currentColor;
-  border-radius:50%;
-  background:rgba(255,248,215,.18);
-  box-shadow:inset 0 0 0 2px rgba(255,255,255,.16);
-}
-.money-rain .money-particle.note{
-  width:calc(var(--size) * 1.55);
-  height:calc(var(--size) * .88);
-  border:1px solid currentColor;
-  border-radius:5px;
-  background:rgba(214,162,31,.045);
-  font-size:calc(var(--size) * .5);
-}
-@keyframes moneyFall{
-  0%{transform:translate3d(0,-55px,0) rotate(var(--rotate))}
-  25%{transform:translate3d(var(--drift),25vh,0) rotate(calc(var(--rotate) + 70deg))}
-  50%{transform:translate3d(calc(var(--drift) * -0.55),52vh,0) rotate(calc(var(--rotate) + 150deg))}
-  75%{transform:translate3d(var(--drift),76vh,0) rotate(calc(var(--rotate) + 225deg))}
-  100%{transform:translate3d(calc(var(--drift) * -0.35),112vh,0) rotate(calc(var(--rotate) + 320deg))}
-}
-html[data-theme="dark"] .money-rain{opacity:.32}
-@media(max-width:430px){.money-rain{opacity:.34}.money-rain .money-particle{filter:none}}
-@media(prefers-reduced-motion:reduce){.money-rain{display:none}}
-/* Keep all interactive content above the decorative layer. */
-.topbar,.content,.bottom-nav,.modal,.menu-sheet,.notice-layer,.pin-screen{position:relative;z-index:2}
-
-/* ===== MithraQ Selected Style — Money Rain Premium Glass V2 ===== */
-:root{
-  --glass-bg:rgba(255,255,255,.72);
-  --glass-border:rgba(255,255,255,.68);
-  --glass-shadow:0 18px 42px rgba(3,74,55,.11), inset 0 1px 0 rgba(255,255,255,.8);
-}
-body{background:radial-gradient(circle at 15% 5%,rgba(214,162,31,.08),transparent 26%),radial-gradient(circle at 90% 22%,rgba(5,107,79,.09),transparent 30%),#edf5f0}
-.app{background:linear-gradient(180deg,rgba(248,252,249,.94),rgba(239,248,242,.96));isolation:isolate}
-.topbar{background:rgba(248,252,250,.78);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid rgba(214,162,31,.32);box-shadow:0 10px 30px rgba(5,107,79,.06)}
-.brand-mark{box-shadow:0 10px 24px rgba(0,105,78,.24),inset 0 1px 0 rgba(255,255,255,.35)}
-.content{position:relative}
-.hero{background:linear-gradient(135deg,rgba(0,104,73,.98),rgba(8,166,111,.92));border:1px solid rgba(255,255,255,.2);box-shadow:0 22px 44px rgba(0,105,78,.2),inset 0 1px 0 rgba(255,255,255,.2)}
-.hero:before{content:"";position:absolute;width:230px;height:230px;border:1px solid rgba(255,255,255,.14);border-radius:50%;right:-90px;top:-100px;box-shadow:0 0 0 28px rgba(255,255,255,.035),0 0 0 58px rgba(255,255,255,.025)}
-.card,.quick,.group-head,.timer-card,.empty{background:var(--glass-bg);backdrop-filter:blur(13px);-webkit-backdrop-filter:blur(13px);border-color:var(--glass-border);box-shadow:var(--glass-shadow)}
-.card:hover,.quick:hover{transform:translateY(-2px);box-shadow:0 22px 42px rgba(3,74,55,.13),inset 0 1px 0 rgba(255,255,255,.9)}
-.card,.quick{transition:transform .18s ease,box-shadow .18s ease}
-.btn{box-shadow:0 10px 22px rgba(5,107,79,.16),inset 0 1px 0 rgba(255,255,255,.15)}
-.bottom-nav{background:rgba(255,255,255,.76);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-color:rgba(255,255,255,.8);box-shadow:0 22px 48px rgba(3,74,55,.17),inset 0 1px 0 rgba(255,255,255,.85)}
-.nav-icon{background:rgba(242,246,244,.78)}
-.nav-menu-circle{box-shadow:0 16px 30px rgba(4,74,54,.32),0 0 0 6px rgba(255,255,255,.9)}
-.menu-sheet-card,.modal-card{background:rgba(251,255,253,.88);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.75)}
-.money-rain{opacity:.52}
-@media(max-width:430px){.money-rain{opacity:.38}.hero{border-radius:22px}.card{border-radius:18px}}
-
-/* ===== Fixed Bottom Navigation Alignment Fix =====
-   Keep the premium navigation locked to the viewport on every page.
-   The decorative-layer stacking rule above must not override fixed positioning. */
+/* MithraQ navigation: locked to the viewport on every screen/page */
 .bottom-nav{
   position:fixed !important;
   left:50% !important;
   right:auto !important;
   bottom:max(10px, env(safe-area-inset-bottom)) !important;
-  transform:translateX(-50%) !important;
-  z-index:100 !important;
-  width:min(calc(100% - 24px), 692px) !important;
-  box-sizing:border-box;
+  transform:translate3d(-50%,0,0) !important;
+  width:min(calc(100% - 20px),692px) !important;
+  z-index:9999 !important;
 }
-.content{
-  padding-bottom:calc(118px + env(safe-area-inset-bottom)) !important;
-}
-@media(max-width:430px){
-  .bottom-nav{
-    width:calc(100% - 20px) !important;
-    bottom:max(8px, env(safe-area-inset-bottom)) !important;
-    border-radius:25px;
-  }
-  .content{
-    padding-bottom:calc(124px + env(safe-area-inset-bottom)) !important;
-  }
-}
-@media(min-width:700px){
-  .bottom-nav{
-    position:fixed !important;
-    bottom:max(14px, env(safe-area-inset-bottom)) !important;
-  }
-}
+.content{padding-bottom:calc(125px + env(safe-area-inset-bottom)) !important}
+@media(min-width:700px){.bottom-nav{bottom:max(14px, env(safe-area-inset-bottom)) !important}}
+@media(max-width:430px){.bottom-nav{width:calc(100% - 20px) !important;bottom:max(8px, env(safe-area-inset-bottom)) !important}.content{padding-bottom:calc(130px + env(safe-area-inset-bottom)) !important}}
