@@ -416,21 +416,30 @@ html[data-theme="dark"] .v-row,html[data-theme="dark"] .v-box{border-color:#2940
 }
 
 
+
 /* MithraQ Style 4 — Luxury Finance background; decorative only */
-body{position:relative;overflow-x:hidden}
+body{position:relative;overflow-x:hidden;background:#eef5f0}
 body::before{
   content:"";
   position:fixed;
   inset:0;
   z-index:0;
   pointer-events:none;
-  opacity:.34;
+  background:linear-gradient(135deg,rgba(5,107,79,.035),rgba(214,162,31,.055));
+}
+.app{position:relative;z-index:1;isolation:isolate}
+.app::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:-1;
+  pointer-events:none;
+  opacity:.72;
   background:
-    radial-gradient(circle at 15% 18%, rgba(12,126,91,.07) 0 2px, transparent 3px),
-    radial-gradient(circle at 84% 72%, rgba(194,151,54,.09) 0 2px, transparent 3px),
-    linear-gradient(135deg, rgba(12,126,91,.025), rgba(255,255,255,0) 45%, rgba(194,151,54,.035)),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='360' viewBox='0 0 420 360'%3E%3Cg fill='none' stroke='%23c8a84e' stroke-width='1' opacity='.42'%3E%3Cpath d='M-20 80 C90 10 150 145 260 65 S390 20 450 80'/%3E%3Cpath d='M-40 285 C70 210 160 350 270 265 S380 215 460 285'/%3E%3C/g%3E%3Cg fill='%230b8060' opacity='.10' font-family='Arial,sans-serif' font-weight='700'%3E%3Ctext x='48' y='116' font-size='68' transform='rotate(-14 48 116)'%3E₹%3C/text%3E%3Ctext x='294' y='225' font-size='76' transform='rotate(12 294 225)'%3E₹%3C/text%3E%3Ctext x='168' y='330' font-size='52' transform='rotate(-8 168 330)'%3E₹%3C/text%3E%3C/g%3E%3Cg fill='%23d8bd70' opacity='.11'%3E%3Crect x='285' y='42' width='92' height='52' rx='8' transform='rotate(13 331 68)'/%3E%3Crect x='22' y='238' width='96' height='54' rx='8' transform='rotate(-12 70 265)'/%3E%3C/g%3E%3C/svg%3E");
-  background-size:auto, auto, auto, 420px 360px;
+    radial-gradient(circle at 12% 15%,rgba(5,107,79,.10) 0 3px,transparent 4px),
+    radial-gradient(circle at 88% 78%,rgba(214,162,31,.12) 0 3px,transparent 4px),
+    linear-gradient(135deg,rgba(5,107,79,.035),transparent 42%,rgba(214,162,31,.05)),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='320' viewBox='0 0 360 320'%3E%3Cg fill='none' stroke='%23c8a84e' stroke-width='1.8' opacity='.55'%3E%3Cpath d='M-30 72 C60 8 130 128 220 58 S330 18 390 72'/%3E%3Cpath d='M-30 270 C65 204 145 326 235 258 S330 220 390 275'/%3E%3C/g%3E%3Cg fill='%23056b4f' opacity='.14' font-family='Arial,sans-serif' font-weight='700'%3E%3Ctext x='32' y='120' font-size='76' transform='rotate(-14 32 120)'%3E₹%3C/text%3E%3Ctext x='258' y='212' font-size='82' transform='rotate(12 258 212)'%3E₹%3C/text%3E%3Ctext x='138' y='304' font-size='60' transform='rotate(-8 138 304)'%3E₹%3C/text%3E%3C/g%3E%3Cg fill='%23d6a21f' opacity='.14'%3E%3Crect x='246' y='34' width='88' height='50' rx='7' transform='rotate(13 290 59)'/%3E%3Crect x='14' y='228' width='92' height='52' rx='7' transform='rotate(-12 60 254)'/%3E%3C/g%3E%3Cg fill='%23d6a21f' opacity='.65'%3E%3Ccircle cx='326' cy='130' r='4'/%3E%3Ccircle cx='82' cy='185' r='3'/%3E%3Ccircle cx='210' cy='110' r='3'/%3E%3C/g%3E%3C/svg%3E");
+  background-size:auto,auto,auto,360px 320px;
   background-repeat:repeat;
 }
-.app{position:relative;z-index:1}
