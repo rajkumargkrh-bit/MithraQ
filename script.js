@@ -98,6 +98,8 @@ function refreshSmartNotifications(){
   if(recentPayments.length) addNotification('Payments received',`${recentPayments.length} payment record(s) added today.`,'success','payments-'+new Date().toISOString().slice(0,10));
   const active=(state.auctions||[]).filter(a=>a.status==='active'||a.running===true);
   if(active.length) addNotification('Auction active',`${active.length} auction(s) are currently active.`,'auction','auction-active');
+  const prizeOpen=(state.auctions||[]).map(prizeInfo).filter(i=>i.status==='pending'||i.status==='partial');
+  if(prizeOpen.length){const tot=prizeOpen.reduce((t,i)=>t+i.balance,0);addNotification('Prize payouts pending',`${prizeOpen.length} auction winner(s) are still waiting for prize money (${money(tot)}).`,'warning','prize-pending-'+prizeOpen.length+'-'+Math.round(tot));}
   const badPhones=invalidPhoneMembers();
   if(badPhones.length) addNotification('Invalid phone numbers',`${badPhones.length} member(s) have an invalid saved phone number and can't be reached on WhatsApp.`,'warning','bad-phone-'+badPhones.map(m=>m.id).sort().join(','));
   state.chits.forEach(c=>{
@@ -171,7 +173,7 @@ function backupData(){const payload={app:'MithraQ',version:5,exportedAt:new Date
 function restoreData(){document.getElementById('restoreFile')?.click();}
 function handleRestore(input){const f=input.files?.[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const x=JSON.parse(r.result);const d=x.data||x;if(!d||!Array.isArray(d.chits)||!Array.isArray(d.members))throw new Error('Invalid backup');uiConfirm('Restore this backup? Current data will be replaced.',()=>{state={chits:d.chits||[],members:d.members||[],auctions:d.auctions||[],payments:d.payments||[],reminders:d.reminders||[]};save();uiAlert('Backup restored successfully.');tab='home';render();input.value='';},()=>{input.value='';});}catch(e){uiAlert('Invalid MithraQ backup file.');input.value='';}};r.readAsText(f);}
 function settingsPanel(){const a=getAuth();return `<div class="card"><h3 style="margin-top:0">Security & Data</h3><div class="muted">Admin: ${esc(a?.name||"Admin")} • Username: ${esc(a?.username||"—")}</div><div class="backup-grid"><button class="btn" onclick="logoutAdmin()">🔒 Logout</button><button class="btn gold" onclick="backupData()">⬇️ Backup Data</button><button class="btn" onclick="restoreData()">⬆️ Restore Data</button></div><input id="restoreFile" class="file-input" type="file" accept="application/json,.json" onchange="handleRestore(this)"><div class="backup-note">Backup includes chits, members, auctions, payments and reminder history. Browser login remains available offline.</div></div>`+supabasePanel()}
-const MENU_TABS=['members','reports','search','history','settings','notifications','activity'];
+const MENU_TABS=['members','reports','search','history','settings','notifications','activity','payouts'];
 let waBroadcastMsg='Hello {name}, this is an update from MithraQ regarding your {chit} chit. Thank you.';
 function waRowHTML(m,payments){
   const paid=payments.filter(p=>String(p.memberId)===String(m.id)).reduce((a,p)=>a+Number(p.amount||0),0);
@@ -238,6 +240,7 @@ function render(){
     else if(tab==='activity')html=activityLogPage();
     else if(tab==='whatsapp')html=whatsappCenter();
     else if(tab==='closure')html=closureReport();
+    else if(tab==='payouts')html=payoutsPage();
     if(typeof html!=='string' || !html.trim()) throw new Error('Empty page output');
     app.innerHTML=html;
   }catch(err){
@@ -321,7 +324,7 @@ function savePayment(memberId,chitId,month){
   const date=document.getElementById('pDate')?.value||new Date().toISOString().slice(0,10);
   const mode=document.getElementById('pMode')?.value||'Cash';
   const note=(document.getElementById('pNote')?.value||'').trim();
-  let p=paymentFor(memberId,month);
+  let p=paymentFor(memberId,month,chitId);
   if(p){
     p.amount=amount; p.date=date; p.mode=mode; p.note=note;
   }else{
@@ -333,10 +336,14 @@ function savePayment(memberId,chitId,month){
 function collectMember(memberId,chitId){
   const m=state.members.find(x=>String(x.id)===String(memberId)),c=chitById(chitId);
   if(!m||!c)return;
-  const month=collectionMonthValue||new Date().toISOString().slice(0,7),existing=paymentFor(memberId,month),expected=memberMonthly(m,c);
+  const month=collectionMonthValue||new Date().toISOString().slice(0,7),existing=paymentFor(memberId,month,chitId),expected=memberMonthly(m,c);
   openModal(existing?'Payment Details':'Collect Payment',`<div class="payment-modal"><div class="payment-person"><div class="avatar">${esc((m.name||'?')[0]).toUpperCase()}</div><div><b>${esc(m.name)}</b><div class="muted">${esc(c.name)} • ${month} • Expected ${money(expected)}</div></div></div><div class="form"><label class="field-label">Amount paid</label><input id="pAmount" type="number" value="${existing?Number(existing.amount):expected}"><label class="field-label">Payment date</label><input id="pDate" type="date" value="${existing?esc(existing.date):new Date().toISOString().slice(0,10)}"><label class="field-label">Payment mode</label><select id="pMode"><option ${existing?.mode==='Cash'?'selected':''}>Cash</option><option ${existing?.mode==='UPI'?'selected':''}>UPI</option><option ${existing?.mode==='Bank'?'selected':''}>Bank</option></select><input id="pNote" placeholder="Note (optional)" value="${esc(existing?.note||'')}"><button class="btn gold full" onclick="savePayment('${String(memberId)}','${String(chitId)}','${month}')">${existing?'Update Payment':'Save Payment'}</button>${existing?`<button class="btn full" onclick="printReceipt('${String(existing.id)}')">🧾 Print ${receiptNo(existing)}</button><button class="btn full" onclick="pdfReceipt('${String(existing.id)}')">📄 PDF Receipt</button><button class="btn danger-outline full" onclick="deletePayment('${String(existing.id)}')">⌫ Delete Payment</button>`:''}<button class="btn full" onclick="whatsappPaymentReminder('${String(memberId)}','${String(chitId)}')">💬 WhatsApp Reminder</button></div></div>`);
 }
-function paymentFor(memberId,month){return state.payments.find(p=>String(p.memberId)===String(memberId)&&p.month===month);}
+function paymentFor(memberId,month,chitId){
+  const mine=state.payments.filter(p=>String(p.memberId)===String(memberId)&&p.month===month);
+  if(chitId==null||chitId==='')return mine[0];
+  return mine.find(p=>p.chitId!=null&&String(p.chitId)===String(chitId))||mine.find(p=>p.chitId==null||p.chitId==='');
+}
 function receiptNo(p){if(!p)return '—'; if(p.receiptNo)return p.receiptNo; const d=String(p.date||'').replace(/-/g,'').slice(0,6)||'000000'; const idx=state.payments.indexOf(p)+1; return 'MQ-'+d+'-'+String(idx).padStart(4,'0');}
 function paymentStatus(p,expected){if(!p)return 'pending';const a=Number(p.amount||0),e=Number(expected||0);return a>=e?'paid':'partial';}
 function deletePayment(id){const p=state.payments.find(x=>String(x.id)===String(id));if(!p)return;uiConfirm('Delete receipt '+receiptNo(p)+'? This payment record will be removed.',()=>{state.payments=state.payments.filter(x=>String(x.id)!==String(p.id));logActivity('Payment deleted','Payment',receiptNo(p));closeModal();render();});}
@@ -344,7 +351,7 @@ function editPayment(id){const p=state.payments.find(x=>String(x.id)===String(id
 function updatePayment(id){const p=state.payments.find(x=>String(x.id)===String(id));if(!p)return;const amount=Number(document.getElementById('epAmount').value||0);if(amount<=0)return uiAlert('Enter a valid amount.');p.amount=amount;p.date=document.getElementById('epDate').value;p.mode=document.getElementById('epMode').value;p.note=document.getElementById('epNote').value.trim();save();closeModal();render();}
 function collection(){if(!state.chits.length)return `<h2 class="page-title">Collection</h2><div class="subtitle">Monthly member payments</div><div class="empty big-empty"><b>Create a chit group first</b><p>Then you can track paid, partial and pending monthly collections.</p><button class="btn gold" onclick="newChit()">+ Create Chit</button></div>`;const c=state.chits[0],month=collectionMonthValue;return `<div class="row"><div><h2 class="page-title">Collection</h2><div class="subtitle">Paid • Partial • Pending</div></div><input class="month-picker" id="collectionMonth" type="month" value="${month}" onchange="setCollectionMonth(this.value)"></div><div class="form collection-filter"><label class="field-label">Chit Group</label><select id="collectionChit" onchange="renderCollectionGroup()">${state.chits.map(x=>`<option value="${x.id}">${esc(x.name)} • ${x.type==='dividend'?'Dividend':'Fixed'}</option>`).join('')}</select></div><div id="collectionGroup">${collectionGroup(c.id,month)}</div><div class="section"><h3>Payment History</h3><span class="muted">${state.payments.length} records</span></div><div class="list">${state.payments.length?state.payments.slice(0,30).map(p=>`<div class="card payment-row"><div style="flex:1"><b>${esc(p.member)}</b><div class="muted">${esc(p.chit)} • ${esc(p.month)} • ${esc(p.date)} • ${esc(p.mode)} • ${receiptNo(p)}</div></div><div style="text-align:right"><b>${money(p.amount)}</b><div><button class="mini-btn" onclick="editPayment('${String(p.id)}')">✎</button> <button class="mini-btn" onclick="printReceipt('${String(p.id)}')">🧾</button> <button class="mini-btn" onclick="pdfReceipt('${String(p.id)}')">📄</button></div></div></div>`).join(''):'<div class="empty">No payment history yet.</div>'}</div>`;}
 function setCollectionMonth(value){collectionMonthValue=value||new Date().toISOString().slice(0,7);renderCollectionGroup();}
-function collectionGroup(id,month){const c=chitById(id),list=membersForChit(id);if(!c)return '';let paid=0,partial=0,pending=0,total=0,expected=0;list.forEach(m=>{const e=memberMonthly(m,c),p=paymentFor(m.id,month);expected+=e;if(!p)pending++;else if(Number(p.amount||0)>=e)paid++;else partial++;if(p)total+=Number(p.amount||0);});return `<div class="collection-stats"><div class="card"><span>Expected</span><b>${money(expected)}</b></div><div class="card"><span>Collected</span><b>${money(total)}</b></div><div class="card"><span>Balance</span><b>${money(Math.max(0,expected-total))}</b></div></div><div class="collection-summary"><span class="badge active">${paid} PAID</span><span class="badge partial">${partial} PARTIAL</span><span class="badge pending">${pending} PENDING</span></div><div class="payment-list"><div class="section"><h3>Members</h3><span class="muted">${list.length} members</span></div>${list.length?list.map(m=>{const p=paymentFor(m.id,month),e=memberMonthly(m,c),st=paymentStatus(p,e),label=st==='paid'?'PAID':st==='partial'?'PARTIAL':'PENDING';return `<div class="card payment-member"><div class="avatar">${esc((m.name||'?')[0]).toUpperCase()}</div><div style="flex:1"><b>${esc(m.name)}</b><div class="muted">Expected ${money(e)} ${p?'• Paid '+money(p.amount):''}</div></div><span class="badge ${st==='paid'?'active':st==='partial'?'partial':'pending'}">${label}</span><button class="action-btn ${p?'edit':'collect'}" onclick="collectMember('${String(m.id)}','${String(id)}')">${p?'Edit':'Collect'}</button>${!p?`<button class="mini-btn" onclick="whatsappPaymentReminder('${String(m.id)}','${String(id)}')">💬</button>`:''}</div>`}).join(''):'<div class="empty">No members in this group.</div>'}</div>`;}
+function collectionGroup(id,month){const c=chitById(id),list=membersForChit(id);if(!c)return '';let paid=0,partial=0,pending=0,total=0,expected=0;list.forEach(m=>{const e=memberMonthly(m,c),p=paymentFor(m.id,month,c.id);expected+=e;if(!p)pending++;else if(Number(p.amount||0)>=e)paid++;else partial++;if(p)total+=Number(p.amount||0);});return `<div class="collection-stats"><div class="card"><span>Expected</span><b>${money(expected)}</b></div><div class="card"><span>Collected</span><b>${money(total)}</b></div><div class="card"><span>Balance</span><b>${money(Math.max(0,expected-total))}</b></div></div><div class="collection-summary"><span class="badge active">${paid} PAID</span><span class="badge partial">${partial} PARTIAL</span><span class="badge pending">${pending} PENDING</span></div><div class="payment-list"><div class="section"><h3>Members</h3><span class="muted">${list.length} members</span></div>${list.length?list.map(m=>{const p=paymentFor(m.id,month,c.id),e=memberMonthly(m,c),st=paymentStatus(p,e),label=st==='paid'?'PAID':st==='partial'?'PARTIAL':'PENDING';return `<div class="card payment-member"><div class="avatar">${esc((m.name||'?')[0]).toUpperCase()}</div><div style="flex:1"><b>${esc(m.name)}</b><div class="muted">Expected ${money(e)} ${p?'• Paid '+money(p.amount):''}</div></div><span class="badge ${st==='paid'?'active':st==='partial'?'partial':'pending'}">${label}</span><button class="action-btn ${p?'edit':'collect'}" onclick="collectMember('${String(m.id)}','${String(id)}')">${p?'Edit':'Collect'}</button>${!p?`<button class="mini-btn" onclick="whatsappPaymentReminder('${String(m.id)}','${String(id)}')">💬</button>`:''}</div>`}).join(''):'<div class="empty">No members in this group.</div>'}</div>`;}
 function renderCollectionGroup(){const id=document.getElementById('collectionChit').value;document.getElementById('collectionGroup').innerHTML=collectionGroup(id,collectionMonthValue);}
 function openModal(title,body){document.getElementById('modalTitle').textContent=title;document.getElementById('modalBody').innerHTML=body;document.getElementById('modal').classList.remove('hidden');}
 function closeModal(){window.__profileReturnId=null;document.getElementById('modal').classList.add('hidden');}
@@ -371,7 +378,7 @@ function printReceipt(paymentId){const p=state.payments.find(x=>String(x.id)===S
 function whatsappPaymentReceipt(paymentId){const p=state.payments.find(x=>String(x.id)===String(paymentId));if(!p)return;const m=state.members.find(x=>String(x.id)===String(p.memberId));if(!m?.phone)return uiAlert('Member phone number is missing.');const text=`MithraQ Payment Receipt\n\nReceipt: ${receiptNo(p)}\nMember: ${m.name}\nChit: ${p.chit}\nMonth: ${p.month}\nAmount Paid: ${money(p.amount)}\nDate: ${p.date}\nMode: ${p.mode}`;waOpenOrWarn(m.phone,text);}
 function whatsappPaymentReminder(memberId,chitId){
   const m=state.members.find(x=>String(x.id)===String(memberId)),c=chitById(chitId); if(!m||!c)return;
-  const month=collectionMonthValue||new Date().toISOString().slice(0,7),p=paymentFor(memberId,month); if(p){uiAlert('This member is already marked as paid for '+month+'.');return;}
+  const month=collectionMonthValue||new Date().toISOString().slice(0,7),p=paymentFor(memberId,month,chitId); if(p){uiAlert('This member is already marked as paid for '+month+'.');return;}
   if(!m.phone){uiAlert('This member does not have a phone number.');return;}
   const text=`MithraQ Payment Reminder\n\nDear ${m.name},\nMonthly chit payment for ${c.name} (${month}) is pending.\nAmount: ${money(m.monthly||c.monthly||0)}\n\nPlease make the payment at your earliest convenience. Thank you.`;
   waOpenOrWarn(m.phone,text);
@@ -432,11 +439,11 @@ function downloadCSV(rows,name){const csv=rows.map(r=>r.map(v=>'"'+String(v??'')
 /* ===== Professional Phase 6: Pending Dashboard + WhatsApp + Daily/Monthly Reports ===== */
 let reportMonthValue=new Date().toISOString().slice(0,7);
 function monthLabel(ym){if(!ym)return '';const [y,m]=ym.split('-');return new Date(Number(y),Number(m)-1,1).toLocaleDateString('en-IN',{month:'long',year:'numeric'});}
-function expectedForMonth(month){return state.members.reduce((sum,m)=>{const c=(m.chitIds||[]).map(chitById).find(Boolean);return sum+memberMonthly(m,c)},0);}
+function expectedForMonth(month){return state.members.reduce((sum,m)=>{const cs=(m.chitIds||[]).map(chitById).filter(Boolean);return sum+(cs.length?cs.reduce((t,c)=>t+memberMonthly(m,c),0):memberMonthly(m,undefined))},0);}
 function paymentsForMonth(month){return state.payments.filter(p=>String(p.month||'')===String(month));}
 function monthCollected(month){return paymentsForMonth(month).reduce((s,p)=>s+Number(p.amount||0),0);}
-function pendingRows(month){return state.members.map(m=>{const c=(m.chitIds||[]).map(chitById).find(Boolean);if(!c)return null;const expected=memberMonthly(m,c),p=paymentFor(m.id,month),paid=Number(p?.amount||0),balance=Math.max(0,expected-paid);if(balance<=0)return null;return {m,c,p,expected,paid,balance};}).filter(Boolean);}
-function whatsappPendingMember(memberId,chitId,month=reportMonthValue){const m=state.members.find(x=>String(x.id)===String(memberId)),c=chitById(chitId);if(!m||!c)return;if(!m.phone)return uiAlert('Phone number is missing for '+(m.name||'this member')+'.');const p=paymentFor(memberId,month),expected=memberMonthly(m,c),paid=Number(p?.amount||0),balance=Math.max(0,expected-paid);if(balance<=0)return uiAlert('No pending balance for '+m.name+'.');const text=`MithraQ Payment Reminder\n\nDear ${m.name},\nYour ${c.name} chit payment for ${monthLabel(month)} is pending.\nExpected: ${money(expected)}\nPaid: ${money(paid)}\nPending: ${money(balance)}\n\nPlease make the pending payment at your earliest convenience. Thank you.`;waOpenOrWarn(m.phone,text);}
+function pendingRows(month){return state.members.flatMap(m=>(m.chitIds||[]).map(chitById).filter(Boolean).map(c=>{const expected=memberMonthly(m,c),p=paymentFor(m.id,month,c.id),paid=Number(p?.amount||0),balance=Math.max(0,expected-paid);if(balance<=0)return null;return {m,c,p,expected,paid,balance};}).filter(Boolean));}
+function whatsappPendingMember(memberId,chitId,month=reportMonthValue){const m=state.members.find(x=>String(x.id)===String(memberId)),c=chitById(chitId);if(!m||!c)return;if(!m.phone)return uiAlert('Phone number is missing for '+(m.name||'this member')+'.');const p=paymentFor(memberId,month,chitId),expected=memberMonthly(m,c),paid=Number(p?.amount||0),balance=Math.max(0,expected-paid);if(balance<=0)return uiAlert('No pending balance for '+m.name+'.');const text=`MithraQ Payment Reminder\n\nDear ${m.name},\nYour ${c.name} chit payment for ${monthLabel(month)} is pending.\nExpected: ${money(expected)}\nPaid: ${money(paid)}\nPending: ${money(balance)}\n\nPlease make the pending payment at your earliest convenience. Thank you.`;waOpenOrWarn(m.phone,text);}
 function whatsappAllPending(month=reportMonthValue){const rows=pendingRows(month);if(!rows.length)return uiAlert('No pending members for '+monthLabel(month)+'.');const valid=rows.filter(x=>waIntlPhone(x.m.phone));if(!valid.length)return uiAlert('No pending member has a valid phone number.');uiConfirm(`Send WhatsApp reminders to ${valid.length} pending member(s)?`,()=>{valid.forEach((x,i)=>setTimeout(()=>whatsappPendingMember(x.m.id,x.c.id,month),i*700));});}
 function setReportMonth(v){if(!v)return;reportMonthValue=v;render();}
 function dailyReport(month){const ps=paymentsForMonth(month);const byDay={};ps.forEach(p=>{const d=p.date||month+'-01';byDay[d]=(byDay[d]||0)+Number(p.amount||0);});return Object.entries(byDay).sort((a,b)=>b[0].localeCompare(a[0])).slice(0,31);}
@@ -448,8 +455,9 @@ function reportData(month){
   const byChit={}; ps.forEach(p=>{const k=String(p.chitId||p.chit||'Unknown');byChit[k]=(byChit[k]||0)+Number(p.amount||0);});
   const auctions=state.auctions.filter(a=>String(a.createdAt||a.date||'').slice(0,7)===String(month));
   const auctionValue=auctions.reduce((sum,a)=>sum+Number(a.bid||0),0);
-  const paidCount=state.members.filter(m=>{const c=(m.chitIds||[]).map(chitById).find(Boolean),p=paymentFor(m.id,month);return c&&p&&Number(p.amount||0)>=memberMonthly(m,c);}).length;
-  const partialCount=state.members.filter(m=>{const c=(m.chitIds||[]).map(chitById).find(Boolean),p=paymentFor(m.id,month);return c&&p&&Number(p.amount||0)>0&&Number(p.amount||0)<memberMonthly(m,c);}).length;
+  const pairs=state.members.flatMap(m=>(m.chitIds||[]).map(chitById).filter(Boolean).map(c=>({m,c,p:paymentFor(m.id,month,c.id)})));
+  const paidCount=pairs.filter(x=>x.p&&Number(x.p.amount||0)>=memberMonthly(x.m,x.c)).length;
+  const partialCount=pairs.filter(x=>x.p&&Number(x.p.amount||0)>0&&Number(x.p.amount||0)<memberMonthly(x.m,x.c)).length;
   return {ps,rows,expected,collected,pending,modes,byMember,byChit,auctions,auctionValue,paidCount,partialCount};
 }
 function printReports(month){
@@ -478,8 +486,8 @@ function reports(){
 function reminderKey(memberId,chitId,month){return String(memberId)+'|'+String(chitId)+'|'+String(month);}
 function reminderFor(memberId,chitId,month){return state.reminders.find(r=>r.key===reminderKey(memberId,chitId,month));}
 function markReminderSent(memberId,chitId,month){const m=state.members.find(x=>String(x.id)===String(memberId)),c=chitById(chitId);if(!m||!c)return;const key=reminderKey(memberId,chitId,month),now=new Date().toISOString(),old=state.reminders.find(r=>r.key===key);if(old){old.sentAt=now;old.count=Number(old.count||0)+1;}else state.reminders.push({key,memberId:String(memberId),chitId:String(chitId),month,sentAt:now,count:1});logActivity('Reminder sent','System',`${m.name} • ${c.name} • ${monthLabel(month)}`);render();}
-function reminderRows(month){return state.members.flatMap(m=>(m.chitIds||[]).map(id=>{const c=chitById(id);if(!c)return null;const expected=memberMonthly(m,c),p=paymentFor(m.id,month),paid=Number(p?.amount||0),balance=Math.max(0,expected-paid);if(balance<=0)return null;return {m,c,expected,paid,balance,reminder:reminderFor(m.id,c.id,month)};}).filter(Boolean));}
-function sendReminderAndMark(memberId,chitId,month){const m=state.members.find(x=>String(x.id)===String(memberId)),c=chitById(chitId);if(!m||!c)return;if(!m.phone)return uiAlert('This member does not have a phone number.');const p=paymentFor(memberId,month),expected=memberMonthly(m,c),paid=Number(p?.amount||0),balance=Math.max(0,expected-paid);if(balance<=0)return uiAlert('No pending balance for '+m.name+'.');const text=`MithraQ Payment Reminder\n\nDear ${m.name},\nYour ${c.name} chit payment for ${monthLabel(month)} is pending.\nExpected: ${money(expected)}\nPaid: ${money(paid)}\nPending: ${money(balance)}\n\nPlease make the pending payment at your earliest convenience. Thank you.`;if(waOpenOrWarn(m.phone,text))markReminderSent(memberId,chitId,month);}
+function reminderRows(month){return state.members.flatMap(m=>(m.chitIds||[]).map(id=>{const c=chitById(id);if(!c)return null;const expected=memberMonthly(m,c),p=paymentFor(m.id,month,c.id),paid=Number(p?.amount||0),balance=Math.max(0,expected-paid);if(balance<=0)return null;return {m,c,expected,paid,balance,reminder:reminderFor(m.id,c.id,month)};}).filter(Boolean));}
+function sendReminderAndMark(memberId,chitId,month){const m=state.members.find(x=>String(x.id)===String(memberId)),c=chitById(chitId);if(!m||!c)return;if(!m.phone)return uiAlert('This member does not have a phone number.');const p=paymentFor(memberId,month,chitId),expected=memberMonthly(m,c),paid=Number(p?.amount||0),balance=Math.max(0,expected-paid);if(balance<=0)return uiAlert('No pending balance for '+m.name+'.');const text=`MithraQ Payment Reminder\n\nDear ${m.name},\nYour ${c.name} chit payment for ${monthLabel(month)} is pending.\nExpected: ${money(expected)}\nPaid: ${money(paid)}\nPending: ${money(balance)}\n\nPlease make the pending payment at your earliest convenience. Thank you.`;if(waOpenOrWarn(m.phone,text))markReminderSent(memberId,chitId,month);}
 function reminderSearch(){const month=document.getElementById('reminderMonth')?.value||reportMonthValue,q=(document.getElementById('reminderSearch')?.value||'').trim().toLowerCase(),filter=document.getElementById('reminderFilter')?.value||'all',el=document.getElementById('reminderRows');if(!el)return;let rows=reminderRows(month).filter(x=>{const hay=[x.m.name,x.m.phone,x.m.memberNo,x.c.name].join(' ').toLowerCase();return !q||hay.includes(q);});if(filter==='pending')rows=rows.filter(x=>!x.reminder);if(filter==='reminded')rows=rows.filter(x=>!!x.reminder);if(filter==='no-phone')rows=rows.filter(x=>!x.m.phone);const summary=document.getElementById('reminderSummary');if(summary){const all=reminderRows(month),sent=all.filter(x=>x.reminder).length;summary.innerHTML=`<span>${all.length} pending</span><span>${sent} reminded</span><span>${all.length-sent} not reminded</span>`;}el.innerHTML=rows.length?rows.map(x=>`<div class="card reminder-row"><div class="avatar">${esc((x.m.name||'?')[0]).toUpperCase()}</div><div class="reminder-main"><b>${esc(x.m.name)}</b><div class="muted">${esc(x.c.name)} • ${esc(x.m.phone||'No phone')}</div><div class="reminder-money">Pending ${money(x.balance)} <small>• Expected ${money(x.expected)} • Paid ${money(x.paid)}</small></div>${x.reminder?`<div class="reminder-sent">✓ Reminded ${esc(new Date(x.reminder.sentAt).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}))} • ${Number(x.reminder.count||1)} time(s)</div>`:''}</div><div class="reminder-actions">${x.m.phone?`<button class="action-btn" onclick="sendReminderAndMark('${String(x.m.id)}','${String(x.c.id)}','${month}')">💬 ${x.reminder?'Remind Again':'WhatsApp'}</button>`:'<span class="badge pending">NO PHONE</span>'}<button class="action-btn collect" onclick="collectionMonthValue='${month}';collectMember('${String(x.m.id)}','${String(x.c.id)}')">₹ Collect</button><button class="action-btn" onclick="member360('${String(x.m.id)}')">👤</button></div></div>`).join(''):'<div class="empty">🎉 No matching pending reminders.</div>';}
 function reminderSetMonth(v){if(!v)return;reportMonthValue=v;reminderSearch();}
 function reminderCenter(){const month=reportMonthValue,all=reminderRows(month),sent=all.filter(x=>x.reminder).length;return `<div class="row"><div><h2 class="page-title">Reminders</h2><div class="subtitle">Track pending member payments and WhatsApp reminders</div></div><input id="reminderMonth" class="month-picker" type="month" value="${month}" onchange="reminderSetMonth(this.value)"></div><div class="grid reminder-stats"><div class="card"><div class="stat-label">PENDING</div><div class="stat-value">${all.length}</div></div><div class="card"><div class="stat-label">PENDING AMOUNT</div><div class="stat-value">${money(all.reduce((s,x)=>s+x.balance,0))}</div></div><div class="card"><div class="stat-label">REMINDED</div><div class="stat-value">${sent}</div></div><div class="card"><div class="stat-label">NOT REMINDED</div><div class="stat-value">${all.length-sent}</div></div></div><div class="reminder-toolbar"><input id="reminderSearch" placeholder="Search member, phone or chit..." oninput="reminderSearch()"><select id="reminderFilter" onchange="reminderSearch()"><option value="all">All Pending</option><option value="pending">Not Reminded</option><option value="reminded">Reminded</option><option value="no-phone">No Phone</option></select></div><div id="reminderSummary" class="reminder-summary"><span>${all.length} pending</span><span>${sent} reminded</span><span>${all.length-sent} not reminded</span></div><div class="row reminder-tools"><button class="btn gold" onclick="remindAllCenter('${month}')">💬 Remind All</button><button class="btn" onclick="exportReminderCSV('${month}')">⬇️ CSV</button></div><div id="reminderRows" class="list reminder-list">${all.length?all.map(x=>`<div class="card reminder-row"><div class="avatar">${esc((x.m.name||'?')[0]).toUpperCase()}</div><div class="reminder-main"><b>${esc(x.m.name)}</b><div class="muted">${esc(x.c.name)} • ${esc(x.m.phone||'No phone')}</div><div class="reminder-money">Pending ${money(x.balance)} <small>• Expected ${money(x.expected)} • Paid ${money(x.paid)}</small></div>${x.reminder?`<div class="reminder-sent">✓ Reminded ${esc(new Date(x.reminder.sentAt).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}))} • ${Number(x.reminder.count||1)} time(s)</div>`:''}</div><div class="reminder-actions">${x.m.phone?`<button class="action-btn" onclick="sendReminderAndMark('${String(x.m.id)}','${String(x.c.id)}','${month}')">💬 ${x.reminder?'Remind Again':'WhatsApp'}</button>`:'<span class="badge pending">NO PHONE</span>'}<button class="action-btn collect" onclick="collectionMonthValue='${month}';collectMember('${String(x.m.id)}','${String(x.c.id)}')">₹ Collect</button><button class="action-btn" onclick="member360('${String(x.m.id)}')">👤</button></div></div>`).join(''):'<div class="empty">🎉 No pending payments for this month.</div>'}</div>`;}
@@ -583,7 +591,7 @@ function auctionRecordHtml(a,c){
       <div><span>TAKE AMOUNT</span><b>${money(Math.max(0,chitAmount-bid))}</b></div>
       <div class="payable-cell"><span>PAYABLE</span><b>${money(fin.payable)}</b></div><div><span>WINNER PAYMENT</span><b>${esc(a.paymentStatus||'Pending')}</b></div>
     </div>
-    <div class="auction-due">Due date: <b>${formatDMY(a.dueDate)}</b></div>
+    ${prizeBlockHTML(a)}<div class="auction-due">Due date: <b>${formatDMY(a.dueDate)}</b></div>
     <div class="member-actions"><button class="action-btn edit" onclick="editAuction('${String(a.id)}')">✎ Edit</button><button class="action-btn" onclick="printAuctionReceipt('${String(a.id)}')">🧾 Receipt</button><button class="action-btn" onclick="pdfAuctionReceipt('${String(a.id)}')">📄 PDF</button><button class="action-btn" onclick="whatsappAuctionResult('${String(a.id)}')">💬 Share</button><button class="action-btn delete" onclick="deleteAuction('${String(a.id)}')">⌫ Delete</button></div>
   </div>`;
 }
@@ -631,14 +639,14 @@ function member360(memberId){
   const auc=state.auctions.filter(a=>String(a.memberId)===String(memberId));
   const expectedMonthly=groups.reduce((s,c)=>s+memberMonthly(m,c),0);
   const currentMonth=new Date().toISOString().slice(0,7);
-  const currentDue=groups.reduce((s,c)=>s+Math.max(0,memberMonthly(m,c)-Number(paymentFor(m.id,currentMonth)?.amount||0)),0);
+  const currentDue=groups.reduce((s,c)=>s+Math.max(0,memberMonthly(m,c)-Number(paymentFor(m.id,currentMonth,c.id)?.amount||0)),0);
   openModal('Member Profile',`<div class="member360">
     <div class="profile-hero"><div class="avatar profile-avatar">${esc((m.name||'?')[0]).toUpperCase()}</div><div><h3>${esc(m.name)}</h3><div class="muted">Member #${esc(m.memberNo||'—')} • ${esc(m.phone||'No phone')}</div><div class="muted">Joined ${esc(m.joiningDate||'—')}</div><div class="muted">Address: ${esc(m.address||'—')}</div><div class="muted">Nominee: ${esc(m.nomineeName||'—')} ${m.nomineePhone?'• '+esc(m.nomineePhone):''}</div></div></div>
     <div class="profile-actions"><button class="btn gold" onclick="window.__profileReturnId='${String(m.id)}';editMember('${String(m.id)}')">✎ Edit</button><button class="btn" onclick="whatsappMember('${String(m.id)}')">💬 WhatsApp</button><button class="btn" onclick="printMemberStatement('${String(m.id)}')">🖨️ Print</button></div>
     <button class="btn full" style="margin:0 0 12px" onclick="openPendingStatement('${String(m.id)}')">📋 Pending Statement (all chits)</button>
     <div class="profile-stats"><div><span>Total Paid</span><b>${money(paid)}</b></div><div><span>Pending Now</span><b>${money(currentDue)}</b></div><div><span>Auctions</span><b>${auc.length}</b></div></div>
     <div class="section"><h3>Chit Groups</h3><span class="muted">${groups.length} groups</span></div>
-    <div class="profile-groups">${groups.map(c=>{const monthPayment=paymentFor(m.id,currentMonth);const due=memberMonthly(m,c);const paidThisMonth=Number(monthPayment?.amount||0);const status=paymentStatus(monthPayment,due);const label=status==='paid'?'PAID':status==='partial'?'PARTIAL':'PENDING';return `<div class="profile-group"><div><b>${esc(c.name)}</b><small>${c.type==='dividend'?'Dividend':'Fixed'} • Monthly ${money(due)}</small></div><div class="profile-group-right"><span class="profile-paid">${money(paidThisMonth)} / ${money(due)}</span><span class="badge ${status==='paid'?'active':status==='partial'?'partial':'pending'}">${label}</span></div></div>`}).join('')||'<div class="empty">No groups assigned.</div>'}</div>
+    <div class="profile-groups">${groups.map(c=>{const monthPayment=paymentFor(m.id,currentMonth,c.id);const due=memberMonthly(m,c);const paidThisMonth=Number(monthPayment?.amount||0);const status=paymentStatus(monthPayment,due);const label=status==='paid'?'PAID':status==='partial'?'PARTIAL':'PENDING';return `<div class="profile-group"><div><b>${esc(c.name)}</b><small>${c.type==='dividend'?'Dividend':'Fixed'} • Monthly ${money(due)}</small></div><div class="profile-group-right"><span class="profile-paid">${money(paidThisMonth)} / ${money(due)}</span><span class="badge ${status==='paid'?'active':status==='partial'?'partial':'pending'}">${label}</span></div></div>`}).join('')||'<div class="empty">No groups assigned.</div>'}</div>
     <div class="section"><h3>Collection History</h3><span class="muted">${ps.length} payments</span></div>
     <div class="profile-history">${ps.length?ps.map(p=>{const c=chitById(p.chitId);const e=memberMonthly(m,c);const st=paymentStatus(p,e);return `<div class="profile-row"><div><b>${esc(p.month||'')}</b><div class="muted">${esc(c?.name||p.chit||'')} • ${esc(p.date||'')} • ${esc(p.mode||'')}</div><small>${esc(receiptNo(p))}</small></div><div class="profile-row-right"><strong>${money(p.amount)}</strong><span class="badge ${st==='paid'?'active':st==='partial'?'partial':'pending'}">${st.toUpperCase()}</span><button class="mini-btn" onclick="printReceipt('${String(p.id)}')">🧾</button><button class="mini-btn" onclick="pdfReceipt('${String(p.id)}')">📄</button><button class="mini-btn" onclick="whatsappPaymentReceipt('${String(p.id)}')">💬</button></div></div>`}).join(''):'<div class="empty">No payments recorded.</div>'}</div>
     <div class="section"><h3>Auction History</h3><span class="muted">${auc.length} wins</span></div>
@@ -649,7 +657,7 @@ function whatsappMember(memberId){const m=state.members.find(x=>String(x.id)===S
 function groupMemberPanel(id){
   const c=chitById(id); if(!c)return '<div class="empty">Chit group not found.</div>';
   const list=membersForChit(id),month=new Date().toISOString().slice(0,7);
-  return list.length?list.map(m=>{const p=paymentFor(m.id,month),e=memberMonthly(m,c),st=paymentStatus(p,e),label=st==='paid'?'PAID':st==='partial'?'PARTIAL':'PENDING',active=m.status!=='inactive';return `<div class="card member-row member ${active?'':'member-inactive'}" data-status="${active?'active':'inactive'}" data-search="${esc([m.name,m.phone,m.memberNo].join(' ').toLowerCase())}"><div class="avatar">${esc((m.name||'?')[0]).toUpperCase()}</div><div style="flex:1"><div class="chit-title">${esc(m.name)}</div><div class="muted">${esc(m.phone||'No phone')} • Member #${esc(m.memberNo||'—')}</div><div class="muted">Joined ${esc(m.joiningDate||'—')} • Monthly ${money(e)} • ${active?'Active':'Inactive'}</div><div class="member-actions"><button class="action-btn collect" onclick="collectMember('${String(m.id)}','${String(c.id)}')">${p?'✓ Payment':'₹ Collect'}</button><button class="action-btn edit" onclick="editMember('${String(m.id)}')">✎ Edit</button><button class="action-btn" onclick="toggleMemberStatus('${String(m.id)}')">${active?'⏸ Inactive':'▶ Active'}</button><button class="action-btn" onclick="member360('${String(m.id)}')">👤 Profile</button><button class="action-btn" onclick="memberStatement('${String(m.id)}')">📋 Statement</button><button class="action-btn" onclick="whatsappMember('${String(m.id)}')">💬 WhatsApp</button><button class="action-btn delete" onclick="deleteMember('${String(m.id)}')">⌫ Delete</button></div></div><span class="badge ${st==='paid'?'active':st==='partial'?'partial':'pending'}">${label}</span></div>`}).join(''):'<div class="empty big-empty"><div class="empty-icon">♙</div><b>No members in this group</b><p>Add members to start collection and auction management.</p><button class="btn gold" onclick="newMember()">+ Add Member</button></div>';
+  return list.length?list.map(m=>{const p=paymentFor(m.id,month,c.id),e=memberMonthly(m,c),st=paymentStatus(p,e),label=st==='paid'?'PAID':st==='partial'?'PARTIAL':'PENDING',active=m.status!=='inactive';return `<div class="card member-row member ${active?'':'member-inactive'}" data-status="${active?'active':'inactive'}" data-search="${esc([m.name,m.phone,m.memberNo].join(' ').toLowerCase())}"><div class="avatar">${esc((m.name||'?')[0]).toUpperCase()}</div><div style="flex:1"><div class="chit-title">${esc(m.name)}</div><div class="muted">${esc(m.phone||'No phone')} • Member #${esc(m.memberNo||'—')}</div><div class="muted">Joined ${esc(m.joiningDate||'—')} • Monthly ${money(e)} • ${active?'Active':'Inactive'}</div><div class="member-actions"><button class="action-btn collect" onclick="collectMember('${String(m.id)}','${String(c.id)}')">${p?'✓ Payment':'₹ Collect'}</button><button class="action-btn edit" onclick="editMember('${String(m.id)}')">✎ Edit</button><button class="action-btn" onclick="toggleMemberStatus('${String(m.id)}')">${active?'⏸ Inactive':'▶ Active'}</button><button class="action-btn" onclick="member360('${String(m.id)}')">👤 Profile</button><button class="action-btn" onclick="memberStatement('${String(m.id)}')">📋 Statement</button><button class="action-btn" onclick="whatsappMember('${String(m.id)}')">💬 WhatsApp</button><button class="action-btn delete" onclick="deleteMember('${String(m.id)}')">⌫ Delete</button></div></div><span class="badge ${st==='paid'?'active':st==='partial'?'partial':'pending'}">${label}</span></div>`}).join(''):'<div class="empty big-empty"><div class="empty-icon">♙</div><b>No members in this group</b><p>Add members to start collection and auction management.</p><button class="btn gold" onclick="newMember()">+ Add Member</button></div>';
 }
 
 /* ===== Chit-wise Collection History — read-only, expandable ===== */
@@ -681,7 +689,7 @@ function historyMonthsForChit(c){
   return sorted.reverse();
 }
 function historyMemberRow(m,c,month){
-  const p=paymentFor(m.id,month), expected=memberMonthly(m,c), status=paymentStatus(p,expected);
+  const p=paymentFor(m.id,month,c.id), expected=memberMonthly(m,c), status=paymentStatus(p,expected);
   const paid=Number(p?.amount||0), balance=Math.max(0,expected-paid);
   return `<div class="history-member-row">
     <div class="history-avatar">${esc((m.name||'?')[0]).toUpperCase()}</div>
@@ -695,8 +703,8 @@ function historyChitDetails(c){
     <div class="history-summary"><span>${members.length} Members</span><span>${months.length} Months</span><span>Monthly ${money(c.monthly||0)}</span></div>
     <div class="history-month-list">${months.map((month,i)=>{
       const rows=members.map(m=>historyMemberRow(m,c,month)).join('');
-      const total=members.reduce((sum,m)=>sum+Number(paymentFor(m.id,month)?.amount||0),0);
-      const paidCount=members.filter(m=>paymentStatus(paymentFor(m.id,month),memberMonthly(m,c))==='paid').length;
+      const total=members.reduce((sum,m)=>sum+Number(paymentFor(m.id,month,c.id)?.amount||0),0);
+      const paidCount=members.filter(m=>paymentStatus(paymentFor(m.id,month,c.id),memberMonthly(m,c))==='paid').length;
       return `<div class="history-month ${i===0?'open':''}" id="hist-month-${c.id}-${month}">
         <button type="button" class="history-month-head" aria-expanded="false" onclick="toggleHistoryMonth('${String(c.id)}','${month}')"><div><b>${esc(historyMonthLabel(month))}</b><span>${paidCount}/${members.length} paid • Total ${money(total)}</span></div><span class="history-chevron">⌄</span></button>
         <div class="history-month-body">${rows||'<div class="empty">No members in this chit.</div>'}</div>
@@ -1090,7 +1098,7 @@ function sendAuctionReminder(chitId,memberId){
 
 /* ===== Phase 11: Member-wise Pending Statement (all chits) ===== */
 function paymentForChit(memberId,chitId,month){
-  return state.payments.find(p=>String(p.memberId)===String(memberId)&&p.month===month&&(!p.chitId||String(p.chitId)===String(chitId)));
+  return paymentFor(memberId,month,chitId);
 }
 function monthRange(startYM,endYM){
   const out=[];let [y,m]=startYM.split('-').map(Number);const [ey,em]=endYM.split('-').map(Number);
@@ -1163,4 +1171,223 @@ function pdfPendingStatement(memberId){
   const y=(doc.lastAutoTable&&doc.lastAutoTable.finalY)||100;
   doc.setFontSize(13);doc.setTextColor(5,107,79);doc.text('Total Pending: '+pdfMoney(d.total),40,y+24);
   doc.save('MithraQ-Pending-'+(d.m.memberNo||d.m.id)+'.pdf');
+}
+
+/* ===== Prize Payout Tracker =====
+   Additive feature. Payout data is stored inside each auction record (a.payouts, a.prizeDeduction),
+   so Backup / Restore / Supabase sync carry it automatically. Prize due = chit amount − winning bid − deduction. */
+function prizeTrackerStart(){return '2026-09-19';} /* auctions confirmed before this date are treated as "old / not marked" (function, not const, so an early render can never hit a TDZ error) */
+function localISODate(d=new Date()){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function payoutUI(){return window.__payoutUI||(window.__payoutUI={status:'open',chit:'all',q:''});}
+function prizeInfo(a){
+  const chit=chitById(a.chitId);
+  const chitAmount=Number(a.chitAmount||chit?.amount||0);
+  const gross=Math.max(0,chitAmount-Number(a.bid||0));
+  const deduction=Math.min(gross,Math.max(0,Number(a.prizeDeduction||0)));
+  const due=gross-deduction;
+  const payouts=Array.isArray(a.payouts)?a.payouts:[];
+  const paid=payouts.reduce((s,p)=>s+Number(p.amount||0),0);
+  const balance=Math.max(0,due-paid);
+  let status;
+  if(due<=0.005||balance<=0.005)status='paid';
+  else if(paid>0)status='partial';
+  else if(!a.prizeDeduction&&String(a.createdAt||'').slice(0,10)<prizeTrackerStart())status='legacy';
+  else status='pending';
+  return {gross,deduction,due,paid,balance,status,payouts};
+}
+function prizeBadge(st){const m={pending:['pending','PENDING'],partial:['partial','PARTIAL'],paid:['active','PAID'],legacy:['partial','OLD • NOT MARKED']};const x=m[st]||m.pending;return `<span class="badge ${x[0]}">${x[1]}</span>`;}
+function nextPrizeVoucherNo(){let max=0;(state.auctions||[]).forEach(a=>(a.payouts||[]).forEach(p=>{const m=/^PV-(\d+)$/.exec(String(p.voucherNo||''));if(m)max=Math.max(max,parseInt(m[1],10));}));return 'PV-'+String(max+1).padStart(4,'0');}
+function findAuction(id){return (state.auctions||[]).find(x=>String(x.id)===String(id));}
+
+/* --- card shown inside every auction record --- */
+function prizeBlockHTML(a){
+  const i=prizeInfo(a),id=String(a.id);
+  let acts='';
+  if(i.status==='legacy')acts=`<button class="action-btn collect" onclick="markPrizePaidEarlier('${id}')">✓ Already paid</button><button class="action-btn" onclick="openPrizePayout('${id}')">₹ Pay now</button>`;
+  else{
+    if(i.balance>0.005)acts+=`<button class="action-btn collect" onclick="openPrizePayout('${id}')">₹ Pay winner</button>`;
+    if(i.payouts.length)acts+=`<button class="action-btn" onclick="openPrizePayout('${id}')">📋 History</button>`;
+    const lv=[...i.payouts].reverse().find(p=>p.voucherNo);
+    if(lv)acts+=`<button class="action-btn" onclick="printPrizeVoucher('${id}','${lv.id}')">🧾 Voucher</button>`;
+  }
+  return `<div class="prize-box"><div class="prize-head"><b>💸 Prize Payout</b>${prizeBadge(i.status)}</div>
+    <div class="prize-grid"><div><span>PRIZE</span><b>${money(i.due)}</b></div><div><span>PAID</span><b>${money(i.paid)}</b></div><div><span>BALANCE</span><b>${money(i.balance)}</b></div></div>
+    ${i.deduction>0?`<div class="muted prize-note">After deduction of ${money(i.deduction)}${a.prizeDeductionNote?' ('+esc(a.prizeDeductionNote)+')':''}</div>`:''}
+    ${acts?`<div class="member-actions">${acts}</div>`:''}</div>`;
+}
+
+/* --- pay / history modal --- */
+function openPrizePayout(id){
+  const a=findAuction(id);if(!a)return;
+  const i=prizeInfo(a);
+  const hist=i.payouts.length?[...i.payouts].reverse().map(p=>`<div class="prize-hist"><div style="flex:1"><b>${money(p.amount)}</b><div class="muted">${formatDMY(p.date)} • ${esc(p.mode||'')}${p.voucherNo?' • '+esc(p.voucherNo):''}${p.note?' • '+esc(p.note):''}</div></div>${p.voucherNo?`<button class="mini-btn" title="Print voucher" onclick="printPrizeVoucher('${String(a.id)}','${String(p.id)}')">🧾</button><button class="mini-btn" title="PDF voucher" onclick="pdfPrizeVoucher('${String(a.id)}','${String(p.id)}')">📄</button><button class="mini-btn" title="Share on WhatsApp" onclick="whatsappPrizePayout('${String(a.id)}','${String(p.id)}')">💬</button>`:''}<button class="mini-btn danger-mini" title="Delete payout" onclick="deletePrizePayout('${String(a.id)}','${String(p.id)}')">⌫</button></div>`).join(''):'<div class="muted">No payouts recorded yet.</div>';
+  openModal('Prize Payout',`<div class="payment-person"><div class="avatar">${esc((a.member||'?')[0]).toUpperCase()}</div><div><b>${esc(a.member||'Winner')}</b><div class="muted">${esc(a.chit||'')} • ${esc(a.round||'Round 1')} • Bid ${money(a.bid)}</div></div></div>
+  <div class="prize-grid" style="margin:12px 0"><div><span>PRIZE</span><b>${money(i.due)}</b></div><div><span>PAID</span><b>${money(i.paid)}</b></div><div><span>BALANCE</span><b>${money(i.balance)}</b></div></div>
+  <div class="form">
+    <label class="field-label">Deduction ₹ (pending dues etc.) — optional</label>
+    <input id="ppDeduct" type="number" min="0" value="${i.deduction||''}" placeholder="0">
+    <input id="ppDeductNote" placeholder="Deduction reason (optional)" value="${esc(a.prizeDeductionNote||'')}">
+    <label class="field-label">Amount paying now ₹</label>
+    <input id="ppAmount" type="number" min="0" value="${i.balance>0.005?Math.round(i.balance*100)/100:''}" placeholder="Amount">
+    <label class="field-label">Payment date</label>
+    <input id="ppDate" type="date" value="${localISODate()}">
+    <label class="field-label">Mode</label>
+    <select id="ppMode"><option>Cash</option><option>UPI</option><option>Bank</option><option>Cheque</option></select>
+    <input id="ppNote" placeholder="Reference / note (UTR, cheque no.)">
+    <button class="btn gold full" onclick="savePrizePayout('${String(a.id)}')">Save Payout</button>
+    <div class="form-note">Enter a deduction only and leave the amount empty to just update the prize amount.</div>
+  </div>
+  <div class="section"><h3>Payout History</h3><span class="muted">${i.payouts.length} record(s)</span></div>${hist}`);
+}
+function savePrizePayout(id){
+  const a=findAuction(id);if(!a)return;
+  const cur=prizeInfo(a);
+  const ded=Math.max(0,Number(document.getElementById('ppDeduct')?.value||0));
+  const dedNote=(document.getElementById('ppDeductNote')?.value||'').trim();
+  const amt=Number(document.getElementById('ppAmount')?.value||0);
+  const date=document.getElementById('ppDate')?.value||'';
+  const mode=document.getElementById('ppMode')?.value||'Cash';
+  const note=(document.getElementById('ppNote')?.value||'').trim();
+  if(ded>cur.gross)return uiAlert('Deduction cannot be more than the prize amount ('+money(cur.gross)+').');
+  const balance=Math.max(0,cur.gross-ded-cur.paid);
+  if(amt>0){
+    if(!date)return uiAlert('Select the payment date.');
+    if(amt>balance+0.005)return uiAlert('Amount is more than the balance to pay ('+money(balance)+').');
+  }else if(ded===Number(a.prizeDeduction||0)){
+    return uiAlert('Enter the amount paid to the winner.');
+  }
+  a.prizeDeduction=ded;a.prizeDeductionNote=dedNote;
+  if(amt>0){
+    a.payouts=Array.isArray(a.payouts)?a.payouts:[];
+    a.payouts.push({id:'po_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),amount:amt,date,mode,note,voucherNo:nextPrizeVoucherNo(),at:new Date().toISOString()});
+    logActivity('Prize payout','Payment',`${a.member||'Winner'} • ${a.chit||''} • ${money(amt)} (${mode})`);
+  }else logActivity('Prize deduction updated','Payment',`${a.member||'Winner'} • ${a.chit||''} • ${money(ded)}`);
+  save();closeModal();render();
+}
+function deletePrizePayout(aid,pid){
+  const a=findAuction(aid);if(!a)return;
+  const p=(a.payouts||[]).find(x=>String(x.id)===String(pid));if(!p)return;
+  uiConfirm('Delete this payout of '+money(p.amount)+'? The balance will be added back.',()=>{
+    a.payouts=a.payouts.filter(x=>String(x.id)!==String(pid));
+    logActivity('Prize payout deleted','Payment',`${a.member||'Winner'} • ${a.chit||''} • ${money(p.amount)}`);
+    save();render();openPrizePayout(aid);
+  });
+}
+
+/* --- old auctions (before the tracker existed) --- */
+function settlePrizeEarlier(a){
+  const i=prizeInfo(a);if(i.balance<=0.005)return false;
+  a.payouts=Array.isArray(a.payouts)?a.payouts:[];
+  a.payouts.push({id:'po_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),amount:i.balance,date:String(a.createdAt||'').slice(0,10)||localISODate(),mode:'Earlier',note:'Marked paid (settled before payout tracker)',voucherNo:'',legacy:true,at:new Date().toISOString()});
+  return true;
+}
+function markPrizePaidEarlier(id){
+  const a=findAuction(id);if(!a)return;
+  const i=prizeInfo(a);
+  uiConfirm(`Mark ${a.member||'winner'}'s prize of ${money(i.balance)} as already paid earlier?`,()=>{if(settlePrizeEarlier(a)){logActivity('Prize marked paid','Payment',`${a.member||'Winner'} • ${a.chit||''} • ${money(i.balance)}`);save();render();}});
+}
+function markAllLegacyPrizesPaid(){
+  const list=(state.auctions||[]).filter(a=>prizeInfo(a).status==='legacy');
+  if(!list.length)return;
+  uiConfirm(`Mark ${list.length} older auction prize(s) as already paid? You can still delete any of these records later.`,()=>{list.forEach(settlePrizeEarlier);logActivity('Old prizes marked paid','Payment',list.length+' auction(s)');save();render();});
+}
+
+/* --- voucher (print / PDF / WhatsApp) --- */
+function prizeVoucherData(aid,pid){
+  const a=findAuction(aid);if(!a)return null;
+  const list=Array.isArray(a.payouts)?a.payouts:[];
+  const idx=list.findIndex(x=>String(x.id)===String(pid));if(idx<0)return null;
+  const p=list[idx],i=prizeInfo(a),m=state.members.find(x=>String(x.id)===String(a.memberId));
+  const upTo=list.slice(0,idx+1).reduce((s,x)=>s+Number(x.amount||0),0);
+  return {a,p,i,m,upTo,left:Math.max(0,i.due-upTo)};
+}
+function printPrizeVoucher(aid,pid){
+  const d=prizeVoucherData(aid,pid);if(!d)return;
+  const {a,p,i,m,upTo,left}=d;
+  const w=window.open('','_blank','width=520,height=780');
+  if(!w){uiAlert('Please allow pop-ups to print.');return;}
+  w.document.write(`<html><head><title>${esc(p.voucherNo)} - MithraQ</title><style>body{font-family:Arial;padding:28px;color:#24463d;max-width:460px;margin:auto}h1{color:#056b4f;margin-bottom:4px}.box{border:1px solid #ddd;border-radius:14px;padding:16px;margin-top:18px}.r{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid #eee}.total{font-size:22px;font-weight:800;color:#056b4f;margin-top:15px}.sign{display:flex;justify-content:space-between;margin-top:46px;font-size:12px;color:#71817c}.sign div{border-top:1px solid #999;padding-top:6px;width:44%;text-align:center}button{margin-top:22px;padding:10px 15px;border:0;border-radius:9px;background:#056b4f;color:white}@media print{button{display:none}}</style></head><body><h1>MithraQ</h1><div>Prize Payout Voucher</div><div class="box"><div class="r"><span>Voucher No</span><b>${esc(p.voucherNo)}</b></div><div class="r"><span>Date</span><b>${formatDMY(p.date)}</b></div><div class="r"><span>Group</span><b>${esc(a.chit||'')}</b></div><div class="r"><span>Winner</span><b>${esc(a.member||'')} (#${esc(m?.memberNo||'—')})</b></div><div class="r"><span>Round</span><b>${esc(a.round||'Round 1')}</b></div><div class="r"><span>Chit Amount</span><b>${money(a.chitAmount)}</b></div><div class="r"><span>Winning Bid</span><b>${money(a.bid)}</b></div><div class="r"><span>Prize Amount</span><b>${money(i.gross)}</b></div>${i.deduction>0?`<div class="r"><span>Deduction${a.prizeDeductionNote?' ('+esc(a.prizeDeductionNote)+')':''}</span><b>- ${money(i.deduction)}</b></div>`:''}<div class="r"><span>Prize Payable</span><b>${money(i.due)}</b></div><div class="r"><span>Mode</span><b>${esc(p.mode||'')}</b></div>${p.note?`<div class="r"><span>Reference</span><b>${esc(p.note)}</b></div>`:''}<div class="r"><span>Total paid so far</span><b>${money(upTo)}</b></div><div class="r"><span>Balance</span><b>${money(left)}</b></div><div class="total">Paid now: ${money(p.amount)}</div></div><div class="sign"><div>Paid by</div><div>Received by (Winner)</div></div><button onclick="window.print()">Print Voucher</button></body></html>`);
+  w.document.close();
+}
+function pdfPrizeVoucher(aid,pid){
+  const JsPDF=ensureJsPDF();if(!JsPDF)return;
+  const d=prizeVoucherData(aid,pid);if(!d)return;
+  const {a,p,i,m,upTo,left}=d;
+  const doc=new JsPDF({unit:'pt',format:[360,660]});
+  doc.setFont('helvetica','bold');doc.setFontSize(18);doc.setTextColor(5,107,79);doc.text('MithraQ',40,40);
+  doc.setFontSize(11);doc.setTextColor(90,90,90);doc.text('Prize Payout Voucher',40,58);
+  doc.setDrawColor(220);doc.line(40,68,320,68);
+  const rows=[['Voucher No',p.voucherNo],['Date',formatDMY(p.date)],['Group',a.chit||''],['Winner',(a.member||'')+' (#'+(m?.memberNo||'—')+')'],['Round',a.round||'Round 1'],['Chit Amount',pdfMoney(a.chitAmount)],['Winning Bid',pdfMoney(a.bid)],['Prize Amount',pdfMoney(i.gross)]];
+  if(i.deduction>0)rows.push(['Deduction','- '+pdfMoney(i.deduction)]);
+  rows.push(['Prize Payable',pdfMoney(i.due)],['Mode',p.mode||''],['Total paid so far',pdfMoney(upTo)],['Balance',pdfMoney(left)]);
+  if(p.note)rows.splice(rows.length-2,0,['Reference',p.note]);
+  const y=pdfKeyValueBlock(doc,rows,92);
+  doc.setDrawColor(220);doc.line(40,y,320,y);
+  doc.setFontSize(16);doc.setTextColor(5,107,79);doc.text('Paid now: '+pdfMoney(p.amount),40,y+28);
+  doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(120,120,120);
+  doc.line(40,y+84,140,y+84);doc.text('Paid by',40,y+96);
+  doc.line(220,y+84,320,y+84);doc.text('Received by (Winner)',220,y+96);
+  doc.save('MithraQ-Prize-'+p.voucherNo+'.pdf');
+}
+function whatsappPrizePayout(aid,pid){
+  const d=prizeVoucherData(aid,pid);if(!d)return;
+  const {a,p,i,m,upTo,left}=d;
+  if(!m?.phone)return uiAlert('Winner phone number is missing.');
+  const text=`MithraQ Prize Payout\n\nVoucher: ${p.voucherNo}\nGroup: ${a.chit}\nWinner: ${a.member}\nRound: ${a.round||'Round 1'}\nPrize payable: ${money(i.due)}\nPaid now: ${money(p.amount)} (${p.mode})\nDate: ${formatDMY(p.date)}\nTotal paid: ${money(upTo)}\nBalance: ${money(left)}\n\nThank you.`;
+  waOpenOrWarn(m.phone,text);
+}
+
+/* --- Prize Payouts page (Menu → Prize Payouts) --- */
+function payoutRows(){
+  const U=payoutUI(),q=String(U.q||'').trim().toLowerCase(),order={pending:0,partial:1,legacy:2,paid:3};
+  return (state.auctions||[]).map(a=>({a,i:prizeInfo(a)})).filter(r=>{
+    const st=r.i.status;
+    if(U.status==='open'&&!(st==='pending'||st==='partial'))return false;
+    if(U.status!=='open'&&U.status!=='all'&&st!==U.status)return false;
+    if(U.chit!=='all'&&String(r.a.chitId)!==String(U.chit))return false;
+    if(q&&![r.a.member,r.a.chit,r.a.round].join(' ').toLowerCase().includes(q))return false;
+    return true;
+  }).sort((x,y)=>order[x.i.status]-order[y.i.status]);
+}
+function payoutRowsHTML(){
+  const rows=payoutRows();
+  return rows.length?rows.map(({a,i})=>{
+    const id=String(a.id),lv=[...i.payouts].reverse().find(p=>p.voucherNo);
+    let acts='';
+    if(i.status==='legacy')acts=`<button class="action-btn collect" onclick="markPrizePaidEarlier('${id}')">✓ Already paid</button><button class="action-btn" onclick="openPrizePayout('${id}')">₹ Pay</button>`;
+    else{
+      if(i.balance>0.005)acts+=`<button class="action-btn collect" onclick="openPrizePayout('${id}')">₹ Pay</button>`;
+      if(i.payouts.length)acts+=`<button class="action-btn" onclick="openPrizePayout('${id}')">📋</button>`;
+      if(lv)acts+=`<button class="action-btn" onclick="whatsappPrizePayout('${id}','${lv.id}')">💬</button>`;
+    }
+    return `<div class="card reminder-row"><div class="avatar">${esc((a.member||'?')[0]).toUpperCase()}</div><div class="reminder-main"><b>${esc(a.member||'Winner')}</b> ${prizeBadge(i.status)}<div class="muted">${esc(a.chit||'')} • ${esc(a.round||'Round 1')} • ${esc(a.date||'')}</div><div class="reminder-money">Prize ${money(i.due)} <small>• Paid ${money(i.paid)} • Balance ${money(i.balance)}</small></div></div><div class="reminder-actions">${acts}</div></div>`;
+  }).join(''):'<div class="empty">No prize payouts match this filter.</div>';
+}
+function payoutFilterChanged(){
+  const U=payoutUI();
+  U.q=document.getElementById('payoutSearch')?.value||'';
+  U.status=document.getElementById('payoutStatus')?.value||'open';
+  U.chit=document.getElementById('payoutChit')?.value||'all';
+  const el=document.getElementById('payoutRows');if(el)el.innerHTML=payoutRowsHTML();
+}
+function payoutsPage(){
+  const U=payoutUI(),all=(state.auctions||[]).map(prizeInfo).filter(i=>i.status!=='legacy');
+  const due=all.reduce((s,i)=>s+i.due,0),paid=all.reduce((s,i)=>s+i.paid,0),bal=all.reduce((s,i)=>s+i.balance,0),waiting=all.filter(i=>i.status==='pending'||i.status==='partial').length;
+  const legacy=(state.auctions||[]).filter(a=>prizeInfo(a).status==='legacy').length;
+  return `<div class="row"><div><h2 class="page-title">Prize Payouts</h2><div class="subtitle">Money paid to auction winners</div></div><button class="btn" onclick="exportPayoutsCSV()">⬇️ CSV</button></div>
+  <div class="grid reminder-stats"><div class="card"><div class="stat-label">PRIZE DUE</div><div class="stat-value">${money(due)}</div></div><div class="card"><div class="stat-label">PAID OUT</div><div class="stat-value">${money(paid)}</div></div><div class="card"><div class="stat-label">BALANCE</div><div class="stat-value">${money(bal)}</div></div><div class="card"><div class="stat-label">WINNERS WAITING</div><div class="stat-value">${waiting}</div></div></div>
+  ${legacy?`<div class="card prize-legacy"><div style="flex:1"><b>${legacy} older auction(s) not marked</b><div class="muted">These were done before payout tracking. If the winners are already paid, mark them in one tap.</div></div><button class="btn gold" onclick="markAllLegacyPrizesPaid()">✓ Mark all paid</button></div>`:''}
+  <div class="reminder-toolbar"><input id="payoutSearch" placeholder="Search winner or chit..." value="${esc(U.q)}" oninput="payoutFilterChanged()"><select id="payoutStatus" onchange="payoutFilterChanged()"><option value="open" ${U.status==='open'?'selected':''}>To Pay (Pending + Partial)</option><option value="pending" ${U.status==='pending'?'selected':''}>Pending</option><option value="partial" ${U.status==='partial'?'selected':''}>Partial</option><option value="paid" ${U.status==='paid'?'selected':''}>Paid</option><option value="legacy" ${U.status==='legacy'?'selected':''}>Old / not marked</option><option value="all" ${U.status==='all'?'selected':''}>All</option></select></div>
+  <div class="reminder-toolbar" style="margin-top:0"><select id="payoutChit" onchange="payoutFilterChanged()"><option value="all">All chit groups</option>${state.chits.map(c=>`<option value="${String(c.id)}" ${String(U.chit)===String(c.id)?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>
+  <div id="payoutRows" class="list">${payoutRowsHTML()}</div>`;
+}
+function exportPayoutsCSV(){
+  const rows=[['Voucher No','Payout Date','Winner','Member No','Phone','Chit','Round','Auction Date','Chit Amount','Winning Bid','Prize Amount','Deduction','Prize Payable','Amount Paid','Mode','Reference','Total Paid','Balance','Status']];
+  (state.auctions||[]).forEach(a=>{
+    const i=prizeInfo(a),m=state.members.find(x=>String(x.id)===String(a.memberId));
+    const base=[a.member||'',m?.memberNo||'',m?.phone||'',a.chit||'',a.round||'Round 1',a.date||'',a.chitAmount||'',a.bid||'',i.gross,i.deduction,i.due];
+    if(i.payouts.length)i.payouts.forEach(p=>rows.push([p.voucherNo||'',p.date||'',...base,p.amount,p.mode||'',p.note||'',i.paid,i.balance,i.status]));
+    else rows.push(['','',...base,0,'','',0,i.balance,i.status]);
+  });
+  downloadCSV(rows,'mithraq-prize-payouts.csv');
 }
