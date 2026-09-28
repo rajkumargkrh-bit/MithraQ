@@ -825,3 +825,6 @@ input::placeholder,textarea::placeholder{font-weight:600;opacity:.8}
 @media(max-width:430px){.money-rain{opacity:.30}}
 html[data-theme="dark"] .app::before{opacity:.32}
 html[data-theme="dark"] .money-rain{opacity:.24}
+
+/* Chit Tools add-on */
+.ct-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.ct-card h3{margin:0 0 7px}.ct-card p{min-height:38px}.ct-result{display:flex;flex-direction:column;align-items:center;gap:5px;margin-top:10px;text-align:center}.ct-line{padding:9px 0;border-bottom:1px solid var(--border)}.ct-score{font-size:22px;color:var(--green)}@media(max-width:560px){.ct-grid{grid-template-columns:1fr}}
